@@ -1,0 +1,10 @@
+# Keep shell scripts LF so they run under bash/WSL/Git-Bash on Windows,
+# and batch scripts CRLF so cmd.exe parses them reliably.
+*.sh   text eol=lf
+*.bat  text eol=crlf
+
+# Java/build sources: normalize to LF in the repo.
+*.java text eol=lf
+*.xml  text eol=lf
+*.MF   text eol=lf
+*.conf text eol=lf

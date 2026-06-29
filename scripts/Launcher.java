@@ -5,6 +5,7 @@ import org.osgi.framework.Constants;
 import org.osgi.framework.launch.Framework;
 import org.osgi.framework.launch.FrameworkFactory;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +35,9 @@ public class Launcher {
 
         List<Bundle> installed = new ArrayList<Bundle>();
         for (int i = 1; i < args.length; i++) {
-            installed.add(context.installBundle("file:" + args[i]));
+            // File.toURI() yields a valid file: URL on every platform
+            // (e.g. file:/C:/... on Windows), unlike "file:" + a raw path.
+            installed.add(context.installBundle(new File(args[i]).toURI().toString()));
         }
         framework.start();
 
