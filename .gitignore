@@ -13,6 +13,8 @@ obfuscation/target/
 .metadata/
 .recommenders/
 *.launch
+# but keep the curated, shared launch config (referenced by scripts + docs)
+!Deployment/launch/greet.launch
 tmp/
 
 # OS / editor

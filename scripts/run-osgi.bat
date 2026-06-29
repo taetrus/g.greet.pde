@@ -1,14 +1,21 @@
 @echo off
 setlocal enabledelayedexpansion
-rem Boots the three greet bundles inside Equinox + Felix SCR to prove the
-rem OBFUSCATED imp bundle still wires up via Declarative Services.
+rem Boots the three greet bundles inside Equinox + Felix SCR, with the Gogo shell
+rem and Equinox console, so you can observe bundle + DS status interactively.
+rem Mirrors Deployment\launch\greet.launch (the Eclipse Equinox launch config).
+rem On startup it prints the three DS lines, then drops to a console prompt:
+rem   lb                list bundles            ss          short bundle status
+rem   scr:list          list DS components      scr:info N  component detail
+rem   close             stop the framework (answer y to confirm)
 rem Windows counterpart of run-osgi.sh.
 rem Expects:
 rem   - scripts\build-bundles.bat has produced Deployment\build\*.jar
 rem   - mvn -f obfuscation\pom.xml package has produced the obfuscated imp jar
 rem
-rem Set USE_PLAIN=1 to run the un-obfuscated imp bundle instead (A/B comparison):
-rem   set USE_PLAIN=1 && scripts\run-osgi.bat
+rem Env:
+rem   USE_PLAIN=1       run the un-obfuscated imp bundle (A/B comparison)
+rem   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
+rem   e.g.  set USE_PLAIN=1 && scripts\run-osgi.bat
 
 cd /d "%~dp0.."
 
@@ -19,9 +26,14 @@ rem Resolve target-platform jars by symbolic-name prefix (version-independent).
 rem The trailing '_' keeps 'org.osgi.service.component_' from matching
 rem 'org.osgi.service.component.annotations_'.
 call :pick org.eclipse.osgi_ EQUINOX
+call :pick org.apache.felix.gogo.runtime_ GOGORT
+call :pick org.apache.felix.gogo.command_ GOGOCMD
+call :pick org.apache.felix.gogo.shell_ GOGOSH
+call :pick org.eclipse.equinox.console_ CONSOLE
 call :pick org.osgi.util.function_ FUNCTION
 call :pick org.osgi.util.promise_ PROMISE
 call :pick org.osgi.service.component_ COMPONENT
+call :pick org.osgi.service.component.annotations_ ANNOTATIONS
 call :pick org.apache.felix.scr_ SCR
 
 set "RUN=%B%\run"
@@ -39,12 +51,18 @@ if "%USE_PLAIN%"=="1" (
 echo ^>^> compiling launcher (release 8)
 javac --release 8 -cp "%EQUINOX%" -d "%RUN%" scripts\Launcher.java || goto :error
 
-rem Bundle resolve order: OSGi util -^> DS API -^> SCR -^> api -^> imp -^> app
-echo ^>^> launching Equinox + Felix SCR
+rem Bundle set mirrors Deployment\launch\greet.launch: Gogo + console for
+rem observability, OSGi util + DS API + SCR, then the three greet bundles.
+echo ^>^> launching Equinox + Felix SCR + Gogo console
 java -cp "%EQUINOX%;%RUN%" Launcher "%RUN%\storage" ^
+  "%GOGORT%" ^
+  "%GOGOCMD%" ^
+  "%GOGOSH%" ^
+  "%CONSOLE%" ^
   "%FUNCTION%" ^
   "%PROMISE%" ^
   "%COMPONENT%" ^
+  "%ANNOTATIONS%" ^
   "%SCR%" ^
   "%B%\com.kk.greet.api.jar" ^
   "!IMP!" ^

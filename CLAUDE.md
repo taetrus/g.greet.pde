@@ -63,12 +63,33 @@ scripts\run-osgi.bat                        :: boots Equinox + Felix SCR with th
 set USE_PLAIN=1 && scripts\run-osgi.bat     :: un-obfuscated bundle (A/B baseline); `set USE_PLAIN=` to clear
 ```
 
-All four should print `Greet.start()` / `App.start()` / `Greet.greet()` on either OS. The
+On startup all four print `Greet.start()` / `App.start()` / `Greet.greet()` on either OS. The
 `.sh` and `.bat` scripts resolve target-platform jars by symbolic-name prefix (not pinned
 version) and differ only in shell syntax and the classpath separator (`:` vs `;`). Bundle
 locations are passed to the framework via `File.toURI()` (`scripts/Launcher.java`) so they
 form valid `file:` URLs on Windows paths too. `.gitattributes` pins `*.sh` to LF and `*.bat`
 to CRLF so both work after a Windows checkout.
+
+### Interactive console (observing bundle + DS status)
+
+`run-osgi.{sh,bat}` mirror `Deployment/launch/greet.launch`: they install the Gogo shell +
+`org.eclipse.equinox.console` alongside Felix SCR, then drop to a live console (the framework
+stays up via `eclipse.ignoreApp=true`, like the Eclipse launch's `-console -consoleLog`).
+After the three DS lines, you get a `g!` prompt:
+
+| command | shows |
+|---------|-------|
+| `ss` / `lb` | bundle states (ACTIVE / RESOLVED / STARTING) |
+| `scr:list` | DS components and whether they're enabled/satisfied |
+| `scr:info <id>` | one component's references, properties, activation |
+| `close` | stop the framework and exit (answer `y` to confirm) |
+
+`scr:list` registers a moment after startup (Felix SCR finishes activating), so if it reports
+"Command not found", wait a second and retry. `scr:list` shows the component as
+`com.kk.greet.imp.Greet` even on the obfuscated bundle — proof the DS entry point was kept.
+
+For scripted/CI checks where you don't want an interactive prompt, set `GREET_MODE=check`:
+the launcher activates DS, prints the three lines, and exits (no console).
 
 What is and isn't obfuscated, and why (`obfuscation/proguard.conf`):
 - **Kept**: `com.kk.greet.imp.Greet` + its `start`/`greet` methods, because
