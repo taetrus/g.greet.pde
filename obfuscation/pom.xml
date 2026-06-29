@@ -17,7 +17,6 @@
     <!-- The PDE-built (here: scripts/build-bundles.sh) input bundle jar. -->
     <greet.imp.jar>${repo.root}/Deployment/build/com.kk.greet.imp.jar</greet.imp.jar>
     <greet.api.jar>${repo.root}/Deployment/build/com.kk.greet.api.jar</greet.api.jar>
-    <ds.annotations.jar>${repo.root}/Deployment/target/org.osgi.service.component.annotations_1.5.1.202212101352.jar</ds.annotations.jar>
   </properties>
 
   <dependencies>
@@ -56,8 +55,6 @@
             <argument>${java.home}/jmods/java.base.jmod</argument>
             <argument>-libraryjars</argument>
             <argument>${greet.api.jar}</argument>
-            <argument>-libraryjars</argument>
-            <argument>${ds.annotations.jar}</argument>
             <argument>-printmapping</argument>
             <argument>${project.build.directory}/mapping.txt</argument>
             <argument>@${project.basedir}/proguard.conf</argument>

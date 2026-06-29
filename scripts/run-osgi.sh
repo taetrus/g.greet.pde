@@ -13,7 +13,12 @@ cd "$(dirname "$0")/.."
 
 T="Deployment/target"
 B="Deployment/build"
-EQUINOX="$(ls $T/org.eclipse.osgi_*.jar | head -1)"
+# Resolve a target-platform jar by symbolic-name prefix, so a version bump in
+# Deployment/target/ doesn't silently break this script. The trailing '_' keeps
+# e.g. 'org.osgi.service.component_' from matching 'org.osgi.service.component.annotations_'.
+pick() { ls "$T/$1"*.jar | head -1; }
+
+EQUINOX="$(pick org.eclipse.osgi_)"
 RUN="$B/run"
 rm -rf "$RUN"; mkdir -p "$RUN/storage"
 
@@ -31,10 +36,10 @@ javac --release 8 -cp "$EQUINOX" -d "$RUN" scripts/Launcher.java
 # Bundle resolve order: OSGi util -> DS API -> SCR -> api -> imp -> app
 echo ">> launching Equinox + Felix SCR"
 java -cp "$EQUINOX:$RUN" Launcher "$RUN/storage" \
-  "$T/org.osgi.util.function_1.2.0.202109301733.jar" \
-  "$T/org.osgi.util.promise_1.3.0.202212101352.jar" \
-  "$T/org.osgi.service.component_1.5.1.202212101352.jar" \
-  "$T/org.apache.felix.scr_2.2.12.jar" \
+  "$(pick org.osgi.util.function_)" \
+  "$(pick org.osgi.util.promise_)" \
+  "$(pick org.osgi.service.component_)" \
+  "$(pick org.apache.felix.scr_)" \
   "$B/com.kk.greet.api.jar" \
   "$IMP" \
   "$B/com.kk.greet.app.jar"
