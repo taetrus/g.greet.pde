@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<?pde version="3.2"?>
+<target name="Base RCP (Binary Only)">
+
+   <location useDefault="true"/>
+
+   <content>
+      <plugins>
+      </plugins>
+      <features>
+         <feature id="org.eclipse.rcp"/>
+      </features>
+   </content>
+	<locations>
+		<location path="${project_loc}/target" type="Directory"/>
+	</locations>
+</target>

@@ -1,0 +1,11 @@
+Manifest-Version: 1.0
+Bundle-ManifestVersion: 2
+Bundle-Name: com.kk.greet.app
+Bundle-SymbolicName: com.kk.greet.app
+Bundle-Version: 1.0.0.qualifier
+Service-Component: OSGI-INF/com.kk.greet.app.App.xml
+Bundle-Vendor: KK
+Automatic-Module-Name: com.kk.greet.app
+Bundle-ActivationPolicy: lazy
+Bundle-RequiredExecutionEnvironment: JavaSE-1.8
+Import-Package: com.kk.greet.api
