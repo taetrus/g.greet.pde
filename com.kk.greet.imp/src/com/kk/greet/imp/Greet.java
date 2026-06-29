@@ -10,12 +10,12 @@ public class Greet implements IGreet {
 
 	@Activate
 	public void start() {
-		System.out.println("Greet.start()");
+		System.out.println(MessageFormatter.format("start"));
 	}
 
 	@Override
 	public void greet() {
-		System.out.println("Greet.greet()");
+		System.out.println(MessageFormatter.format("greet"));
 	}
 
 }

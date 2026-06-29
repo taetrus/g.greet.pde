@@ -36,6 +36,40 @@ This is an Eclipse PDE project — there is no command-line build. Open the work
 - **Set the target platform**: open `Deployment/greet.target` and click *Set as Active Target Platform* (it points at `Deployment/target/` plus the `org.eclipse.rcp` feature).
 - **Run**: create an *OSGi Framework* run configuration including the three `com.kk.greet.*` bundles plus the Felix SCR / Gogo / Equinox bundles from the target. Success looks like the three print lines above in the console.
 
+## Obfuscation (name obfuscation via ProGuard + Maven)
+
+The `obfuscation/` module runs ProGuard over the **already-built** `com.kk.greet.imp`
+bundle JAR — PDE (or `scripts/build-bundles.sh`) stays the compiler; Maven only obfuscates.
+This demonstrates what name obfuscation can and cannot do in a DS runtime.
+
+Pipeline (run under JDK 21 — see the JDK note below):
+```
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home
+./scripts/build-bundles.sh                 # CLI stand-in for PDE "Export deployable plug-ins"; emits Java 8 bytecode
+mvn -f obfuscation/pom.xml package          # -> obfuscation/target/com.kk.greet.imp-obf.jar + mapping.txt
+./scripts/run-osgi.sh                       # boots Equinox + Felix SCR with the OBFUSCATED bundle
+USE_PLAIN=1 ./scripts/run-osgi.sh           # same, with the un-obfuscated bundle (A/B baseline)
+```
+All three should print `Greet.start()` / `App.start()` / `Greet.greet()`.
+
+What is and isn't obfuscated, and why (`obfuscation/proguard.conf`):
+- **Kept**: `com.kk.greet.imp.Greet` + its `start`/`greet` methods, because
+  `OSGI-INF/com.kk.greet.imp.Greet.xml` references the class by FQN and activates `start`.
+  Rename any of these and SCR can't load/activate/bind the component. The exported
+  `com.kk.greet.api` package is a library reference and is never renamed (it's the contract).
+- **Renamed**: `MessageFormatter` (a deliberately-added package-private helper) → `a`, proving
+  internals are obfuscated while the DS surface stays intact. See `mapping.txt` after a run.
+- Config uses `-target 1.8`, `-dontoptimize`, `-dontshrink` so the *only* transformation is renaming.
+
+**Reality check on protection**: this is a low-cost deterrent, not a security boundary — bytecode
+stays fully decompilable, there is no string/control-flow protection (those need a commercial tool
+like Allatori/Zelix/DashO), and the DS class names you're forced to keep are exactly an attacker's
+entry points.
+
+**JDK note**: the project targets **Java 1.8** (`--release 8`, ProGuard `-target 1.8`; output is
+class-file v52). Run the obfuscation under **JDK 21** — ProGuard 7.5.0 rejects the JDK 26
+`java.base` (class major 70 > supported 66). JDK 21's `java.base.jmod` (major 65) works.
+
 ## Conventions
 
 - Bundle Java packages mirror the bundle symbolic name (`com.kk.greet.<api|imp|app>`); keep that mapping when adding bundles.
