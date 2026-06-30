@@ -30,6 +30,28 @@
 
   <build>
     <plugins>
+      <!-- pom-packaged modules bind no goals that create target/; ProGuard's
+           -printmapping/-outjars won't create missing parent dirs, so make it
+           ourselves before the obfuscation exec runs (else: FileNotFoundException). -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>ensure-output-dir</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>exec-maven-plugin</artifactId>
