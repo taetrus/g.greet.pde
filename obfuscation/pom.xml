@@ -7,20 +7,25 @@
   <groupId>com.kk.greet</groupId>
   <artifactId>obfuscation</artifactId>
   <version>1.0.0</version>
-  <!-- No sources of its own: this module only obfuscates a PDE-built bundle jar. -->
-  <packaging>pom</packaging>
+  <!-- Contains only ObfuscationRunner: it derives ProGuard keep rules from each
+       PDE-built bundle's own metadata (MANIFEST.MF + OSGI-INF DS descriptors)
+       and obfuscates every bundle jar found in Deployment/build - no per-bundle
+       configuration. PDE (or scripts/build-bundles) stays the compiler. -->
+  <packaging>jar</packaging>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- Repo root, relative to this module. -->
     <repo.root>${project.basedir}/..</repo.root>
-    <!-- The PDE-built (here: scripts/build-bundles.sh) input bundle jar. -->
-    <greet.imp.jar>${repo.root}/Deployment/build/com.kk.greet.imp.jar</greet.imp.jar>
-    <greet.api.jar>${repo.root}/Deployment/build/com.kk.greet.api.jar</greet.api.jar>
+    <!-- Where scripts/build-bundles (the PDE export stand-in) puts bundle jars. -->
+    <bundles.input.dir>${repo.root}/Deployment/build</bundles.input.dir>
+    <!-- Target-platform jars (OSGi framework + DS APIs), used as -libraryjars. -->
+    <deployment.target.dir>${repo.root}/Deployment/target</deployment.target.dir>
   </properties>
 
   <dependencies>
-    <!-- JDK-21-capable ProGuard; provides the proguard.ProGuard main class on the exec classpath. -->
+    <!-- JDK-21-capable ProGuard; the runner drives it via its (de facto stable)
+         programmatic entry points: Configuration/ConfigurationParser/ProGuard. -->
     <dependency>
       <groupId>com.guardsquare</groupId>
       <artifactId>proguard-base</artifactId>
@@ -30,27 +35,14 @@
 
   <build>
     <plugins>
-      <!-- pom-packaged modules bind no goals that create target/; ProGuard's
-           -printmapping/-outjars won't create missing parent dirs, so make it
-           ourselves before the obfuscation exec runs (else: FileNotFoundException). -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <version>3.1.0</version>
-        <executions>
-          <execution>
-            <id>ensure-output-dir</id>
-            <phase>prepare-package</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <configuration>
-              <target>
-                <mkdir dir="${project.build.directory}"/>
-              </target>
-            </configuration>
-          </execution>
-        </executions>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <!-- Match the repo-wide Java 8 convention (runs under JDK 21). -->
+          <release>8</release>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
@@ -58,7 +50,7 @@
         <version>3.5.0</version>
         <executions>
           <execution>
-            <id>obfuscate-imp-bundle</id>
+            <id>obfuscate-bundles</id>
             <phase>package</phase>
             <goals>
               <goal>java</goal>
@@ -66,20 +58,12 @@
           </execution>
         </executions>
         <configuration>
-          <mainClass>proguard.ProGuard</mainClass>
-          <!-- Explicit invocation: jar paths here (Maven-resolved), keep-rules in proguard.conf. -->
+          <mainClass>com.kk.greet.obfuscation.ObfuscationRunner</mainClass>
           <arguments>
-            <argument>-injars</argument>
-            <argument>${greet.imp.jar}</argument>
-            <argument>-outjars</argument>
-            <argument>${project.build.directory}/com.kk.greet.imp-obf.jar</argument>
-            <argument>-libraryjars</argument>
-            <argument>${java.home}/jmods/java.base.jmod</argument>
-            <argument>-libraryjars</argument>
-            <argument>${greet.api.jar}</argument>
-            <argument>-printmapping</argument>
-            <argument>${project.build.directory}/mapping.txt</argument>
-            <argument>@${project.basedir}/proguard.conf</argument>
+            <argument>${bundles.input.dir}</argument>
+            <argument>${project.build.directory}</argument>
+            <argument>${project.basedir}/proguard-common.conf</argument>
+            <argument>${deployment.target.dir}</argument>
           </arguments>
         </configuration>
       </plugin>

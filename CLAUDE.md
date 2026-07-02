@@ -38,9 +38,33 @@ This is an Eclipse PDE project — there is no command-line build. Open the work
 
 ## Obfuscation (name obfuscation via ProGuard + Maven)
 
-The `obfuscation/` module runs ProGuard over the **already-built** `com.kk.greet.imp`
-bundle JAR — PDE (or `scripts/build-bundles.sh`) stays the compiler; Maven only obfuscates.
-This demonstrates what name obfuscation can and cannot do in a DS runtime.
+The `obfuscation/` module obfuscates the **already-built** bundle JARs — PDE (or
+`scripts/build-bundles.sh`) stays the compiler; Maven only obfuscates. There is **no
+per-bundle ProGuard configuration**: `ObfuscationRunner`
+(`obfuscation/src/main/java/com/kk/greet/obfuscation/ObfuscationRunner.java`) scans every
+jar in `Deployment/build/`, derives the keep rules from each bundle's own metadata, and
+runs ProGuard per bundle in-process. Adding a fourth bundle needs zero config here.
+
+How the keep rules are derived (metadata → rule):
+
+| bundle metadata | generated rule |
+|---|---|
+| `Export-Package: p` (MANIFEST.MF) | `-keep class p.* { *; }` — exported API stays intact |
+| `Bundle-Activator: C` | `-keep class C { *; }` |
+| DS `implementation@class = C` (OSGI-INF XML) | `-keep class C { <init>(...); }` |
+| `@activate/@deactivate/@modified` + the DS default names | `-keepclassmembers` on those methods |
+| `reference@bind/@unbind/@updated` | `-keepclassmembers` on those methods |
+| `reference@field` (SCR ≥1.3) / `@activation-fields` (1.4) | `-keepclassmembers` on those fields |
+
+A jar with no DS components, no activator, and only exported packages (i.e.
+`com.kk.greet.api`) is classified pure-API and **copied through unchanged**. The generated
+rules land in `obfuscation/target/keep/<symbolic-name>.pro` (auditable; regenerated every
+build). Flags common to all bundles (`-target 1.8`, `-dontoptimize`, `-dontshrink`,
+`-keepattributes`) live in `obfuscation/proguard-common.conf`. Outputs per obfuscated
+bundle: `obfuscation/target/<symbolic-name>-obf.jar` + `<symbolic-name>-mapping.txt`
+(there is no single `mapping.txt` anymore). SCR namespace parsing is version-agnostic
+(v1.0–v1.5); `Service-Component` wildcards (`OSGI-INF/*.xml`) and quoted version ranges in
+`Export-Package` are handled.
 
 Pipeline (run the *obfuscation* step under JDK 21 — see the JDK note below).
 Each step has a `.sh` (macOS/Linux/Git-Bash/WSL) and a `.bat` (Windows cmd) form.
@@ -49,18 +73,18 @@ Each step has a `.sh` (macOS/Linux/Git-Bash/WSL) and a `.bat` (Windows cmd) form
 ```
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home
 ./scripts/build-bundles.sh                 # CLI stand-in for PDE "Export deployable plug-ins"; emits Java 8 bytecode
-mvn -f obfuscation/pom.xml package          # -> obfuscation/target/com.kk.greet.imp-obf.jar + mapping.txt
-./scripts/run-osgi.sh                       # boots Equinox + Felix SCR with the OBFUSCATED bundle
-USE_PLAIN=1 ./scripts/run-osgi.sh           # same, with the un-obfuscated bundle (A/B baseline)
+mvn -f obfuscation/pom.xml package          # -> obfuscation/target/*-obf.jar, keep/*.pro, *-mapping.txt
+./scripts/run-osgi.sh                       # boots Equinox + Felix SCR with the OBFUSCATED imp + app bundles
+USE_PLAIN=1 ./scripts/run-osgi.sh           # same, with the un-obfuscated bundles (A/B baseline)
 ```
 
 **Windows (cmd.exe):**
 ```
 set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21
 scripts\build-bundles.bat                   :: same as above, emits Java 8 bytecode
-mvn -f obfuscation\pom.xml package          :: -> obfuscation\target\com.kk.greet.imp-obf.jar + mapping.txt
-scripts\run-osgi.bat                        :: boots Equinox + Felix SCR with the OBFUSCATED bundle
-set USE_PLAIN=1 && scripts\run-osgi.bat     :: un-obfuscated bundle (A/B baseline); `set USE_PLAIN=` to clear
+mvn -f obfuscation\pom.xml package          :: -> obfuscation\target\*-obf.jar, keep\*.pro, *-mapping.txt
+scripts\run-osgi.bat                        :: boots Equinox + Felix SCR with the OBFUSCATED imp + app bundles
+set USE_PLAIN=1 && scripts\run-osgi.bat     :: un-obfuscated bundles (A/B baseline); `set USE_PLAIN=` to clear
 ```
 
 On startup all four print `Greet.start()` / `App.start()` / `Greet.greet()` on either OS. The
@@ -91,14 +115,18 @@ After the three DS lines, you get a `g!` prompt:
 For scripted/CI checks where you don't want an interactive prompt, set `GREET_MODE=check`:
 the launcher activates DS, prints the three lines, and exits (no console).
 
-What is and isn't obfuscated, and why (`obfuscation/proguard.conf`):
-- **Kept**: `com.kk.greet.imp.Greet` + its `start`/`greet` methods, because
-  `OSGI-INF/com.kk.greet.imp.Greet.xml` references the class by FQN and activates `start`.
-  Rename any of these and SCR can't load/activate/bind the component. The exported
-  `com.kk.greet.api` package is a library reference and is never renamed (it's the contract).
+What is and isn't obfuscated, and why (all derived automatically — see the table above):
+- **Kept**: `com.kk.greet.imp.Greet` + `start` (from its DS descriptor) and
+  `com.kk.greet.app.App` + `start` + injected field `greetService` (from its v1.3
+  descriptor). Rename any of these and SCR can't load/activate/bind the component.
+  `Greet.greet()` survives without a rule because `IGreet` is a `-libraryjars` type and
+  ProGuard never renames methods overriding library types. `com.kk.greet.api` is
+  copied through unchanged (pure API bundle).
 - **Renamed**: `MessageFormatter` (a deliberately-added package-private helper) → `a`, proving
-  internals are obfuscated while the DS surface stays intact. See `mapping.txt` after a run.
-- Config uses `-target 1.8`, `-dontoptimize`, `-dontshrink` so the *only* transformation is renaming.
+  internals are obfuscated while the DS surface stays intact. See
+  `obfuscation/target/com.kk.greet.imp-mapping.txt` after a run.
+- `proguard-common.conf` uses `-target 1.8`, `-dontoptimize`, `-dontshrink` so the *only*
+  transformation is renaming.
 
 **Reality check on protection**: this is a low-cost deterrent, not a security boundary — bytecode
 stays fully decompilable, there is no string/control-flow protection (those need a commercial tool

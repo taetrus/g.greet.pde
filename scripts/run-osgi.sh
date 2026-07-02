@@ -9,10 +9,10 @@
 #   close             stop the framework and exit
 # Expects:
 #   - scripts/build-bundles.sh has produced Deployment/build/*.jar
-#   - mvn -f obfuscation/pom.xml package has produced the obfuscated imp jar
+#   - mvn -f obfuscation/pom.xml package has produced the obfuscated bundle jars
 #
 # Env:
-#   USE_PLAIN=1     run the un-obfuscated imp bundle (A/B comparison)
+#   USE_PLAIN=1     run the un-obfuscated bundles (A/B comparison)
 #   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
 
 set -euo pipefail
@@ -29,13 +29,24 @@ EQUINOX="$(pick org.eclipse.osgi_)"
 RUN="$B/run"
 rm -rf "$RUN"; mkdir -p "$RUN/storage"
 
-if [ "${USE_PLAIN:-0}" = "1" ]; then
-  IMP="$B/com.kk.greet.imp.jar"
-  echo ">> using PLAIN imp bundle: $IMP"
-else
-  IMP="obfuscation/target/com.kk.greet.imp-obf.jar"
-  echo ">> using OBFUSCATED imp bundle: $IMP"
-fi
+# Pick the obfuscated or plain jar for one greet bundle. Falls back to the
+# plain jar (with a note) if the obfuscated one hasn't been built yet.
+bundle_for() {
+  local sn="$1" obf="obfuscation/target/$1-obf.jar"
+  if [ "${USE_PLAIN:-0}" = "1" ]; then
+    echo ">> using PLAIN $sn: $B/$sn.jar" >&2
+    echo "$B/$sn.jar"
+  elif [ -f "$obf" ]; then
+    echo ">> using OBFUSCATED $sn: $obf" >&2
+    echo "$obf"
+  else
+    echo ">> NOTE: $obf not found, falling back to PLAIN $sn" >&2
+    echo "$B/$sn.jar"
+  fi
+}
+
+IMP="$(bundle_for com.kk.greet.imp)"
+APP="$(bundle_for com.kk.greet.app)"
 
 echo ">> compiling launcher (release 8)"
 javac --release 8 -cp "$EQUINOX" -d "$RUN" scripts/Launcher.java
@@ -56,4 +67,4 @@ java -cp "$EQUINOX:$RUN" Launcher "$RUN/storage" \
   "$(pick org.apache.felix.scr_)" \
   "$B/com.kk.greet.api.jar" \
   "$IMP" \
-  "$B/com.kk.greet.app.jar"
+  "$APP"

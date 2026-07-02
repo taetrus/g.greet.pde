@@ -10,10 +10,10 @@ rem   close             stop the framework (answer y to confirm)
 rem Windows counterpart of run-osgi.sh.
 rem Expects:
 rem   - scripts\build-bundles.bat has produced Deployment\build\*.jar
-rem   - mvn -f obfuscation\pom.xml package has produced the obfuscated imp jar
+rem   - mvn -f obfuscation\pom.xml package has produced the obfuscated bundle jars
 rem
 rem Env:
-rem   USE_PLAIN=1       run the un-obfuscated imp bundle (A/B comparison)
+rem   USE_PLAIN=1       run the un-obfuscated bundles (A/B comparison)
 rem   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
 rem   e.g.  set USE_PLAIN=1 && scripts\run-osgi.bat
 
@@ -40,13 +40,8 @@ set "RUN=%B%\run"
 if exist "%RUN%" rmdir /s /q "%RUN%"
 mkdir "%RUN%\storage"
 
-if "%USE_PLAIN%"=="1" (
-  set "IMP=%B%\com.kk.greet.imp.jar"
-  echo ^>^> using PLAIN imp bundle: !IMP!
-) else (
-  set "IMP=obfuscation\target\com.kk.greet.imp-obf.jar"
-  echo ^>^> using OBFUSCATED imp bundle: !IMP!
-)
+call :pickbundle com.kk.greet.imp IMP
+call :pickbundle com.kk.greet.app APP
 
 echo ^>^> compiling launcher (release 8)
 javac --release 8 -cp "%EQUINOX%" -d "%RUN%" scripts\Launcher.java || goto :error
@@ -66,8 +61,25 @@ java -cp "%EQUINOX%;%RUN%" Launcher "%RUN%\storage" ^
   "%SCR%" ^
   "%B%\com.kk.greet.api.jar" ^
   "!IMP!" ^
-  "%B%\com.kk.greet.app.jar"
+  "!APP!"
 exit /b %errorlevel%
+
+:pickbundle
+rem :pickbundle <bundle-symbolic-name> <output-var>
+rem Picks the obfuscated or plain jar for one greet bundle. Falls back to the
+rem plain jar (with a note) if the obfuscated one hasn't been built yet.
+set "_OBF=obfuscation\target\%~1-obf.jar"
+if "%USE_PLAIN%"=="1" (
+  set "%~2=%B%\%~1.jar"
+  echo ^>^> using PLAIN %~1: %B%\%~1.jar
+) else if exist "%_OBF%" (
+  set "%~2=%_OBF%"
+  echo ^>^> using OBFUSCATED %~1: %_OBF%
+) else (
+  set "%~2=%B%\%~1.jar"
+  echo ^>^> NOTE: %_OBF% not found, falling back to PLAIN %~1
+)
+goto :eof
 
 :pick
 rem :pick <symbolic-name-prefix> <output-var>
