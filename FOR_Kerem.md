@@ -46,7 +46,13 @@ field and injection silently can't happen.
 ## The obfuscation pipeline
 
 PDE (or `scripts/build-bundles.sh` / `.bat`, its CLI stand-in) compiles the
-bundles. Then:
+bundles. The scripts are thin wrappers around `scripts/BundleBuilder.java`,
+which *auto-discovers* every bundle project in the repo root and derives the
+whole build from each project's own metadata — compile order from
+`Import/Export-Package`, `--release` level from
+`Bundle-RequiredExecutionEnvironment`, sources from `build.properties`
+`source.*`, shipped resources (like the DS XMLs) from `bin.includes`. Same
+zero-config idea as the obfuscation step, applied to the build. Then:
 
 ```
 mvn -f obfuscation/pom.xml package        (run under JDK 21)
@@ -132,7 +138,8 @@ library type's method. The API bundle protects its implementors for free.
 com.kk.greet.api|imp|app/    the three PDE bundles (src/, META-INF/, OSGI-INF/)
 Deployment/                  target platform jars + greet.target + greet.launch
 Deployment/build/            build-bundles output: the plain bundle jars
-scripts/                     build-bundles, run-osgi (.sh + .bat), Launcher.java
+scripts/                     build-bundles + run-osgi wrappers (.sh + .bat),
+                             BundleBuilder.java (metadata-driven build), Launcher.java
 obfuscation/                 the Maven module: ObfuscationRunner + proguard-common.conf
 obfuscation/target/          *-obf.jar, *-mapping.txt, keep/*.pro   (all generated)
 ```

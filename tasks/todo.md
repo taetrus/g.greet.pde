@@ -1,3 +1,22 @@
+# Metadata-driven build-bundles (auto-discover PDE projects)
+
+- [x] 1. Baseline capture from current scripts
+- [x] 2. scripts/BundleBuilder.java (discover → topo sort → compile → assemble)
+- [x] 3. build-bundles.sh/.bat → thin wrappers
+- [x] 4. Parity + pipeline + fake-4th-bundle verification
+- [x] 5. Docs (CLAUDE.md, FOR_Kerem.md)
+
+Review: new jars vs old-script baseline — entry sets identical, all .class/.xml
+members byte-identical (manifest no longer gains a jar-tool Created-By line;
+more faithful to PDE). Shuffled explicit args reordered by topo sort; bogus arg
+exits 1 with a clear message. Fake com.kk.greet.imp2 project: discovered, built,
+obfuscated (Greet2 kept, its MessageFormatter → a) with zero config edits, then
+removed. Final 3-bundle pipeline A/B (GREET_MODE=check, obf vs USE_PLAIN=1)
+prints identical DS lines. .bat wrapper is a 5-line mirror, reviewed by
+inspection (no Windows box).
+
+---
+
 # Automated OSGi/DS-aware ProGuard keep-rule generation
 
 Plan: ~/.claude/plans/serene-drifting-leaf.md (approved)
