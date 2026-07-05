@@ -1,0 +1,8 @@
+; Pin UTF-8 for every editor that touches this repo (Eclipse 2021-03+,
+; VS Code, IntelliJ, Notepad++ all honor EditorConfig). This prevents
+; "unmappable character (0xE7) for encoding UTF-8" errors caused by files
+; being saved in the platform codepage (Cp1254 on Turkish Windows).
+root = true
+
+[*]
+charset = utf-8

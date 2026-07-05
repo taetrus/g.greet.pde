@@ -5,6 +5,7 @@ import org.osgi.service.component.annotations.Component;
 
 import com.kk.greet.api.IGreet;
 
+// Encoding canary — must stay compilable: çğıöşü ÇĞİÖŞÜ
 @Component
 public class Greet implements IGreet {
 

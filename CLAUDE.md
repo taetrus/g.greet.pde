@@ -145,6 +145,17 @@ entry points.
 class-file v52). Run the obfuscation under **JDK 21** — ProGuard 7.5.0 rejects the JDK 26
 `java.base` (class major 70 > supported 66). JDK 21's `java.base.jmod` (major 65) works.
 
+## Encoding (UTF-8 everywhere)
+
+Source may contain Turkish characters. Encoding is pinned at four layers, and all four must stay in place — on Turkish Windows the platform default is Cp1254, which produces `unmappable character (0xE7) for encoding UTF-8` errors when any layer falls back to it:
+
+1. `.settings/org.eclipse.core.resources.prefs` in every project: `encoding/<project>=UTF-8` (governs the Eclipse editor and JDT builds; committed, so it survives workspace re-import).
+2. `javacDefaultEncoding.. = UTF-8` in every `build.properties` (governs headless PDE/Ant export builds, which do **not** read the `.settings` prefs).
+3. `.editorconfig` at the repo root: `charset = utf-8` (governs non-Eclipse editors).
+4. Each bundle's main source file carries an "Encoding canary" comment with Turkish characters — if any tool regresses to Cp1254, compilation fails loudly at the canary instead of silently corrupting real strings. Do not remove these comments.
+
+When adding a bundle, replicate layers 1, 2, and 4. Full details, verification steps, and the migration procedure for existing repos are in `ENCODING.md`.
+
 ## Conventions
 
 - Bundle Java packages mirror the bundle symbolic name (`com.kk.greet.<api|imp|app>`); keep that mapping when adding bundles.
