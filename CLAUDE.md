@@ -148,7 +148,8 @@ entry points.
 
 **JDK note**: the project targets **Java 1.8** (`--release 8`, ProGuard `-target 1.8`; output is
 class-file v52). The obfuscation runs under any reasonably current JDK: ProGuard is at **7.9.1**
-(7.5.0 rejected `java.base` newer than JDK 21; verified working under JDK 25). JDKs built
+(7.5.0 rejected `java.base` newer than JDK 21; the whole pipeline is verified under both
+JDK 21 and JDK 25). JDKs built
 without a `jmods/` directory (JEP 493 linkable run-time images, e.g. some Temurin 24+ builds)
 are handled automatically — ObfuscationRunner dumps the `java.*` modules from the `jrt:` image
 into `target/jdk-runtime-classes.jar` and uses that as `-libraryjars`.
