@@ -37,8 +37,10 @@ import javax.tools.ToolProvider;
  *   MANIFEST.MF  Bundle-SymbolicName                 -> jar name Deployment/build/<sn>.jar
  *   MANIFEST.MF  Import-Package / Export-Package    -> inter-project compile order (topo sort)
  *   MANIFEST.MF  Bundle-RequiredExecutionEnvironment -> javac --release level
+ *   MANIFEST.MF  Bundle-ClassPath                   -> nested library jars (lib/*.jar) added to
+ *                                                      that project's compile classpath
  *   build.properties  source.*                      -> source roots to compile
- *   build.properties  bin.includes                  -> resources shipped in the jar (e.g. OSGI-INF)
+ *   build.properties  bin.includes                  -> resources shipped in the jar (e.g. OSGI-INF, lib/)
  *
  * Compile classpath per project = its dependency projects' class dirs + every
  * target-platform jar in Deployment/target/.
@@ -132,6 +134,7 @@ public final class BundleBuilder {
         final Set<String> exportedPackages = new LinkedHashSet<String>();
         final List<Path> sourceRoots = new ArrayList<Path>();
         final List<String> binIncludes = new ArrayList<String>();
+        final List<Path> classpathJars = new ArrayList<Path>();
         Manifest manifest;
 
         private Project(Path dir) {
@@ -159,6 +162,17 @@ public final class BundleBuilder {
             p.exportedPackages.addAll(parseHeader(p.manifest.getMainAttributes().getValue("Export-Package")));
             p.release = releaseFromEE(p.symbolicName,
                     p.manifest.getMainAttributes().getValue("Bundle-RequiredExecutionEnvironment"));
+            // Nested library jars (Bundle-ClassPath: ., lib/foo.jar) are part of
+            // the bundle's own classpath; "." is the bundle itself.
+            for (String entry : parseHeader(p.manifest.getMainAttributes().getValue("Bundle-ClassPath"))) {
+                if (!entry.equals(".")) {
+                    Path nested = dir.resolve(entry);
+                    if (!Files.isRegularFile(nested)) {
+                        fail(p.symbolicName + ": Bundle-ClassPath entry not found: " + entry);
+                    }
+                    p.classpathJars.add(nested);
+                }
+            }
 
             Properties props = new Properties();
             try (InputStream in = Files.newInputStream(buildProps)) {
@@ -276,6 +290,9 @@ public final class BundleBuilder {
         }
 
         StringBuilder cp = new StringBuilder();
+        for (Path jar : p.classpathJars) {
+            cp.append(jar).append(java.io.File.pathSeparatorChar);
+        }
         for (Path dir : builtClassDirs.values()) {
             cp.append(dir).append(java.io.File.pathSeparatorChar);
         }

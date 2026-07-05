@@ -24,12 +24,13 @@
   </properties>
 
   <dependencies>
-    <!-- JDK-21-capable ProGuard; the runner drives it via its (de facto stable)
-         programmatic entry points: Configuration/ConfigurationParser/ProGuard. -->
+    <!-- The runner drives ProGuard via its (de facto stable) programmatic entry
+         points: Configuration/ConfigurationParser/ProGuard. 7.9.x reads the
+         java.base of current JDKs (7.5.0 rejected anything newer than JDK 21). -->
     <dependency>
       <groupId>com.guardsquare</groupId>
       <artifactId>proguard-base</artifactId>
-      <version>7.5.0</version>
+      <version>7.9.1</version>
     </dependency>
   </dependencies>
 

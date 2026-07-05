@@ -15,7 +15,7 @@ Three bundles plus a deployment definition. They communicate **only** through th
 - `com.kk.greet.api` — the contract. Exports package `com.kk.greet.api` containing the `IGreet` interface. This is the only package shared between bundles (`Export-Package` here, `Import-Package` in the others).
 - `com.kk.greet.imp` — the service **provider**. `Greet` implements `IGreet` and is registered as a DS component that `provide`s the `IGreet` service.
 - `com.kk.greet.app` — the service **consumer**. `App` is a DS component with a mandatory (`1..1`) `@Reference` to `IGreet`; the runtime injects the `Greet` instance.
-- `com.kk.greet.ui` — a Swing window as a DS component (`GreetFrame`). All visible text comes from **external resource bundles** in `configs/lang/messages[_tr|_en].properties` (UTF-8, loaded via a custom `ResourceBundle.Control` because Java 8 reads .properties as ISO-8859-1 by default). Language is chosen at launch via `-Dgreet.lang` or the `GREET_LANG` env var (default `en`; unknown values fall back to the base/English bundle — the platform default locale is deliberately ignored). In `GREET_MODE=check` runs the window is skipped but the localized title is printed for scripted assertions.
+- `com.kk.greet.ui` — a Swing window as a DS component (`GreetFrame`), laid out with **MigLayout from a `Bundle-ClassPath` nested jar** (`lib/miglayout-3.7.4-swing.jar`) to prove bundle-embedded third-party libraries survive the build + obfuscation pipeline. All visible text comes from **external resource bundles** in `configs/lang/messages[_tr|_en].properties` (UTF-8, loaded via a custom `ResourceBundle.Control` because Java 8 reads .properties as ISO-8859-1 by default). Language is chosen at launch via `-Dgreet.lang` or the `GREET_LANG` env var (default `en`; unknown values fall back to the base/English bundle — the platform default locale is deliberately ignored). In `GREET_MODE=check` runs the window is skipped but the localized title is printed for scripted assertions.
 - `Deployment/` — PDE target platform (`greet.target`) and the bundle JARs (`Deployment/target/`) needed to run: Equinox, Felix Gogo shell/runtime/command, Felix SCR, and OSGi component/util bundles.
 
 ### How wiring works (read this before editing components)
@@ -52,6 +52,7 @@ How the keep rules are derived (metadata → rule):
 |---|---|
 | `Export-Package: p` (MANIFEST.MF) | `-keep class p.* { *; }` — exported API stays intact |
 | `Bundle-Activator: C` | `-keep class C { *; }` |
+| `Bundle-ClassPath: lib/x.jar` | `-keep class <pkg>.* { *; }` for every package in the nested jar — third-party libraries are never renamed (they may use reflection internally); the jar itself is carried through as a resource |
 | DS `implementation@class = C` (OSGI-INF XML) | `-keep class C { <init>(...); }` |
 | `@activate/@deactivate/@modified` + the DS default names | `-keepclassmembers` on those methods |
 | `reference@bind/@unbind/@updated` | `-keepclassmembers` on those methods |
@@ -67,12 +68,12 @@ bundle: `obfuscation/target/<symbolic-name>-obf.jar` + `<symbolic-name>-mapping.
 (v1.0–v1.5); `Service-Component` wildcards (`OSGI-INF/*.xml`) and quoted version ranges in
 `Export-Package` are handled.
 
-Pipeline (run the *obfuscation* step under JDK 21 — see the JDK note below).
+Pipeline (any current JDK works for every step — see the JDK note below).
 Each step has a `.sh` (macOS/Linux/Git-Bash/WSL) and a `.bat` (Windows cmd) form.
 
 **macOS / Linux:**
 ```
-export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home
+export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home   # any current JDK
 ./scripts/build-bundles.sh                 # PDE-export stand-in: auto-discovers bundle projects; emits Java 8 bytecode
 mvn -f obfuscation/pom.xml package          # -> obfuscation/target/*-obf.jar, keep/*.pro, *-mapping.txt
 ./scripts/run-osgi.sh                       # boots Equinox + Felix SCR with the OBFUSCATED imp + app bundles
@@ -81,7 +82,7 @@ USE_PLAIN=1 ./scripts/run-osgi.sh           # same, with the un-obfuscated bundl
 
 **Windows (cmd.exe):**
 ```
-set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21
+set JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21   :: any current JDK
 scripts\build-bundles.bat                   :: same as above (both wrappers run scripts\BundleBuilder.java)
 mvn -f obfuscation\pom.xml package          :: -> obfuscation\target\*-obf.jar, keep\*.pro, *-mapping.txt
 scripts\run-osgi.bat                        :: boots Equinox + Felix SCR with the OBFUSCATED imp + app bundles
@@ -94,8 +95,9 @@ On startup all four print `Greet.start()` / `App.start()` / `Greet.greet()` on e
 source-launch, so the build logic exists once, not per shell). It **auto-discovers** every
 bundle project at the repo root (dir with `META-INF/MANIFEST.MF` + `build.properties`) and
 builds each from its own metadata: `Import/Export-Package` → compile order (topological),
-`Bundle-RequiredExecutionEnvironment` → `--release` level, `build.properties` `source.*` →
-sources, `bin.includes` → shipped resources (e.g. `OSGI-INF/`). Compile classpath = dependency
+`Bundle-RequiredExecutionEnvironment` → `--release` level, `Bundle-ClassPath` → nested
+library jars (`lib/*.jar`) on that project's compile classpath, `build.properties`
+`source.*` → sources, `bin.includes` → shipped resources (e.g. `OSGI-INF/`, `lib/`). Compile classpath = dependency
 projects' classes + all `Deployment/target/*.jar`. Optional args restrict the build to the
 named project dirs. The `run-osgi.{sh,bat}` scripts resolve target-platform jars by
 symbolic-name prefix (not pinned version). Bundle locations are passed to the framework via
@@ -133,7 +135,9 @@ What is and isn't obfuscated, and why (all derived automatically — see the tab
   copied through unchanged (pure API bundle).
 - **Renamed**: `MessageFormatter` (a deliberately-added package-private helper) → `a`, proving
   internals are obfuscated while the DS surface stays intact. See
-  `obfuscation/target/com.kk.greet.imp-mapping.txt` after a run.
+  `obfuscation/target/com.kk.greet.imp-mapping.txt` after a run. Likewise `com.kk.greet.ui`'s
+  `Messages` → `a` while MigLayout inside `lib/` stays byte-identical (`Bundle-ClassPath`
+  keep rules + carried through as a resource).
 - `proguard-common.conf` uses `-target 1.8`, `-dontoptimize`, `-dontshrink` so the *only*
   transformation is renaming.
 
@@ -143,8 +147,11 @@ like Allatori/Zelix/DashO), and the DS class names you're forced to keep are exa
 entry points.
 
 **JDK note**: the project targets **Java 1.8** (`--release 8`, ProGuard `-target 1.8`; output is
-class-file v52). Run the obfuscation under **JDK 21** — ProGuard 7.5.0 rejects the JDK 26
-`java.base` (class major 70 > supported 66). JDK 21's `java.base.jmod` (major 65) works.
+class-file v52). The obfuscation runs under any reasonably current JDK: ProGuard is at **7.9.1**
+(7.5.0 rejected `java.base` newer than JDK 21; verified working under JDK 25). JDKs built
+without a `jmods/` directory (JEP 493 linkable run-time images, e.g. some Temurin 24+ builds)
+are handled automatically — ObfuscationRunner dumps the `java.*` modules from the `jrt:` image
+into `target/jdk-runtime-classes.jar` and uses that as `-libraryjars`.
 
 ## Encoding (UTF-8 everywhere)
 

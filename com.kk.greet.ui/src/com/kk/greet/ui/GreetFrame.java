@@ -1,7 +1,6 @@
 package com.kk.greet.ui;
 
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
 
 import javax.swing.BorderFactory;
 import javax.swing.JFrame;
@@ -14,14 +13,22 @@ import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Deactivate;
 
+import net.miginfocom.layout.LayoutUtil;
+import net.miginfocom.swing.MigLayout;
+
 // Encoding canary — must stay compilable: çğıöşü ÇĞİÖŞÜ
 /**
  * DS component that opens a small Swing window on activation. Every visible
  * text comes from the external resource bundle (configs/lang) via
  * {@link Messages} — no user-facing literals in code.
  *
+ * The layout uses MigLayout from lib/ (a Bundle-ClassPath nested jar), proving
+ * that bundle-embedded third-party libraries survive the build + obfuscation
+ * pipeline.
+ *
  * In GREET_MODE=check runs the window is skipped (headless/CI); the localized
- * title is still printed, so scripted checks can assert language selection.
+ * title and the MigLayout version are still printed, so scripted checks can
+ * assert language selection and nested-jar classloading.
  */
 @Component
 public class GreetFrame {
@@ -31,7 +38,8 @@ public class GreetFrame {
 	@Activate
 	public void start() {
 		System.out.println("GreetFrame.start() lang=" + Messages.language()
-				+ " title=" + Messages.get("ui.title"));
+				+ " title=" + Messages.get("ui.title")
+				+ " miglayout=" + LayoutUtil.getVersion());
 
 		if ("check".equalsIgnoreCase(System.getenv("GREET_MODE"))) {
 			return;
@@ -40,11 +48,11 @@ public class GreetFrame {
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
 			public void run() {
-				JPanel fields = new JPanel(new GridLayout(0, 2, 8, 8));
+				JPanel fields = new JPanel(new MigLayout("wrap 2", "[right]rel[grow,fill,200::]", ""));
 				fields.add(new JLabel(Messages.get("ui.label.name")));
-				fields.add(new JTextField(Messages.get("ui.field.name"), 16));
+				fields.add(new JTextField(Messages.get("ui.field.name")));
 				fields.add(new JLabel(Messages.get("ui.label.city")));
-				fields.add(new JTextField(Messages.get("ui.field.city"), 16));
+				fields.add(new JTextField(Messages.get("ui.field.city")));
 
 				JLabel greeting = new JLabel(Messages.get("ui.greeting"), JLabel.CENTER);
 				greeting.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));

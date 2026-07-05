@@ -4,11 +4,18 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.LinkedHashSet;
@@ -18,6 +25,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.regex.Pattern;
 
@@ -37,6 +45,8 @@ import proguard.ProGuard;
  *
  *   MANIFEST.MF  Export-Package      -> exported API packages are kept wholesale
  *   MANIFEST.MF  Bundle-Activator    -> activator class kept
+ *   MANIFEST.MF  Bundle-ClassPath    -> nested library jars (lib/*.jar): third-party
+ *                                       classes are kept wholesale, never renamed
  *   MANIFEST.MF  Service-Component   -> locates the DS descriptors, and each
  *   OSGI-INF/*.xml (SCR v1.0..v1.5)  -> component class, lifecycle methods
  *                                       (activate/deactivate/modified), bind/
@@ -106,8 +116,11 @@ public final class ObfuscationRunner {
         pg.add(bundle.jar.toString());
         pg.add("-outjars");
         pg.add(outDir.resolve(bundle.symbolicName + "-obf.jar").toString());
+        // All JDK modules, not just java.base: bundles using e.g. Swing need
+        // java.desktop in the library pool so ProGuard sees the full class
+        // hierarchy when deciding what it may rename.
         pg.add("-libraryjars");
-        pg.add(Paths.get(System.getProperty("java.home"), "jmods", "java.base.jmod").toString());
+        pg.add(jdkLibraryPath(outDir));
         // Other bundles' plain jars: inter-bundle references only go through
         // exported packages, which are kept wholesale, so plain jars are sound.
         for (BundleInfo other : all) {
@@ -132,12 +145,55 @@ public final class ObfuscationRunner {
         new ProGuard(configuration).execute();
     }
 
+    /**
+     * ProGuard -libraryjars entry for the JDK API classes. JDKs that ship a
+     * jmods/ directory are used directly; JDKs built without one (JEP 493
+     * linkable run-time images, e.g. some Temurin 24+ builds) get the java.*
+     * modules dumped from the jrt: run-time image into one jar, once per build.
+     */
+    private static String jdkLibraryPath(Path outDir) throws IOException {
+        Path jmods = Paths.get(System.getProperty("java.home"), "jmods");
+        if (Files.isDirectory(jmods)) {
+            return jmods + "(!**.jar;!module-info.class)";
+        }
+        Path libJar = outDir.resolve("jdk-runtime-classes.jar");
+        if (!Files.exists(libJar)) {
+            System.out.println(">> no jmods/ in " + System.getProperty("java.home")
+                    + " - dumping java.* modules from the jrt: image to " + libJar);
+            FileSystem jrt = FileSystems.getFileSystem(URI.create("jrt:/"));
+            try (JarOutputStream out = new JarOutputStream(Files.newOutputStream(libJar))) {
+                try (DirectoryStream<Path> modules = Files.newDirectoryStream(jrt.getPath("/modules"))) {
+                    for (Path module : modules) {
+                        if (!module.getFileName().toString().startsWith("java.")) {
+                            continue;
+                        }
+                        Files.walkFileTree(module, new SimpleFileVisitor<Path>() {
+                            @Override
+                            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                                    throws IOException {
+                                String name = module.relativize(file).toString().replace('\\', '/');
+                                if (name.endsWith(".class") && !name.equals("module-info.class")) {
+                                    out.putNextEntry(new JarEntry(name));
+                                    Files.copy(file, out);
+                                    out.closeEntry();
+                                }
+                                return FileVisitResult.CONTINUE;
+                            }
+                        });
+                    }
+                }
+            }
+        }
+        return libJar.toString();
+    }
+
     /** Everything the keep-rule derivation needs, read from one bundle jar. */
     private static final class BundleInfo {
         final Path jar;
         final String symbolicName;
         final Set<String> exportedPackages = new LinkedHashSet<String>();
         final Set<String> classPackages = new TreeSet<String>();
+        final Set<String> nestedLibPackages = new TreeSet<String>();
         final List<DsComponent> components = new ArrayList<DsComponent>();
         String activator;
 
@@ -164,6 +220,36 @@ public final class ObfuscationRunner {
                     if (name.endsWith(".class")) {
                         int slash = name.lastIndexOf('/');
                         b.classPackages.add(slash < 0 ? "" : name.substring(0, slash).replace('/', '.'));
+                    }
+                }
+                // Bundle-ClassPath nested library jars (".": the bundle itself).
+                // Their classes are program classes for ProGuard (it descends into
+                // nested archives), so without keep rules it would rename them.
+                for (String entry : parseHeader(mf.getMainAttributes().getValue("Bundle-ClassPath"))) {
+                    if (entry.equals(".")) {
+                        continue;
+                    }
+                    JarEntry nested = jarFile.getJarEntry(entry);
+                    if (nested == null) {
+                        System.out.println(">> WARNING: " + jarPath.getFileName()
+                                + " Bundle-ClassPath entry not found: " + entry);
+                        continue;
+                    }
+                    try (java.util.jar.JarInputStream jin =
+                            new java.util.jar.JarInputStream(jarFile.getInputStream(nested))) {
+                        for (JarEntry je; (je = jin.getNextJarEntry()) != null;) {
+                            String name = je.getName();
+                            if (!name.endsWith(".class")) {
+                                continue;
+                            }
+                            int slash = name.lastIndexOf('/');
+                            if (slash < 0) {
+                                System.out.println(">> WARNING: " + jarPath.getFileName() + " " + entry
+                                        + " has a default-package class (" + name + ") - not covered by keep rules");
+                            } else {
+                                b.nestedLibPackages.add(name.substring(0, slash).replace('/', '.'));
+                            }
+                        }
                     }
                 }
                 for (String clause : parseHeader(mf.getMainAttributes().getValue("Service-Component"))) {
@@ -193,6 +279,15 @@ public final class ObfuscationRunner {
                     w.println();
                     w.println("# MANIFEST.MF Bundle-Activator: framework instantiates it by name");
                     w.println("-keep class " + activator + " { *; }");
+                }
+                if (!nestedLibPackages.isEmpty()) {
+                    w.println();
+                    w.println("# MANIFEST.MF Bundle-ClassPath nested library jars: third-party code is");
+                    w.println("# never renamed - it may use reflection internally, and only the bundle's");
+                    w.println("# own calls into it are ours to obfuscate.");
+                    for (String pkg : nestedLibPackages) {
+                        w.println("-keep class " + pkg + ".* { *; }");
+                    }
                 }
                 for (DsComponent c : components) {
                     w.println();
