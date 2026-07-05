@@ -14,6 +14,8 @@
 # Env:
 #   USE_PLAIN=1     run the un-obfuscated bundles (A/B comparison)
 #   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
+#   GREET_LANG=tr|en  UI language; picks configs/lang/messages_<lang>.properties
+#                     (default en; unknown values fall back to English)
 
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -47,6 +49,7 @@ bundle_for() {
 
 IMP="$(bundle_for com.kk.greet.imp)"
 APP="$(bundle_for com.kk.greet.app)"
+UI="$(bundle_for com.kk.greet.ui)"
 
 echo ">> compiling launcher (release 8)"
 javac --release 8 -cp "$EQUINOX" -d "$RUN" scripts/Launcher.java
@@ -67,4 +70,5 @@ java -cp "$EQUINOX:$RUN" Launcher "$RUN/storage" \
   "$(pick org.apache.felix.scr_)" \
   "$B/com.kk.greet.api.jar" \
   "$IMP" \
-  "$APP"
+  "$APP" \
+  "$UI"

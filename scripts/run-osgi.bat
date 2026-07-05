@@ -15,6 +15,8 @@ rem
 rem Env:
 rem   USE_PLAIN=1       run the un-obfuscated bundles (A/B comparison)
 rem   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
+rem   GREET_LANG=tr^|en  UI language; picks configs\lang\messages_^<lang^>.properties
+rem                     (default en; unknown values fall back to English)
 rem   e.g.  set USE_PLAIN=1 && scripts\run-osgi.bat
 
 cd /d "%~dp0.."
@@ -42,6 +44,7 @@ mkdir "%RUN%\storage"
 
 call :pickbundle com.kk.greet.imp IMP
 call :pickbundle com.kk.greet.app APP
+call :pickbundle com.kk.greet.ui UI
 
 echo ^>^> compiling launcher (release 8)
 javac --release 8 -cp "%EQUINOX%" -d "%RUN%" scripts\Launcher.java || goto :error
@@ -61,7 +64,8 @@ java -cp "%EQUINOX%;%RUN%" Launcher "%RUN%\storage" ^
   "%SCR%" ^
   "%B%\com.kk.greet.api.jar" ^
   "!IMP!" ^
-  "!APP!"
+  "!APP!" ^
+  "!UI!"
 exit /b %errorlevel%
 
 :pickbundle
