@@ -43,7 +43,8 @@ import javax.tools.ToolProvider;
  *   build.properties  bin.includes                  -> resources shipped in the jar (e.g. OSGI-INF, lib/)
  *
  * Compile classpath per project = its dependency projects' class dirs + every
- * target-platform jar in Deployment/target/.
+ * target-platform jar under $GREET_TARGET_DIR (default: Deployment/target/,
+ * scanned recursively).
  *
  * Usage:  java scripts/BundleBuilder.java [projectDir...]
  * With no args, all bundle projects in the repo root are discovered and built.
@@ -56,7 +57,8 @@ import javax.tools.ToolProvider;
 public final class BundleBuilder {
 
     private static final Path OUT = Paths.get("Deployment", "build");
-    private static final Path TARGET_PLATFORM = Paths.get("Deployment", "target");
+    private static final String TARGET_DIR_ENV = "GREET_TARGET_DIR";
+    private static final Path DEFAULT_TARGET_PLATFORM = Paths.get("Deployment", "target");
 
     public static void main(String[] args) throws Exception {
         List<Project> projects = new ArrayList<Project>();
@@ -90,15 +92,7 @@ public final class BundleBuilder {
             }
         }
 
-        List<Path> targetJars = new ArrayList<Path>();
-        if (Files.isDirectory(TARGET_PLATFORM)) {
-            try (DirectoryStream<Path> jars = Files.newDirectoryStream(TARGET_PLATFORM, "*.jar")) {
-                for (Path j : jars) {
-                    targetJars.add(j);
-                }
-            }
-            targetJars.sort(null);
-        }
+        List<Path> targetJars = collectTargetJars();
 
         deleteRecursive(OUT);
         Files.createDirectories(OUT);
@@ -123,6 +117,50 @@ public final class BundleBuilder {
                 System.out.println(j);
             }
         }
+    }
+
+    /**
+     * Target-platform jars for the compile classpath. Directory comes from the
+     * GREET_TARGET_DIR env var (for repos whose platform lives elsewhere),
+     * defaulting to Deployment/target; scanned recursively so PDE-style layouts
+     * (e.g. a plugins/ subfolder) work. An explicitly configured dir that is
+     * missing or yields no jars is an error; the default merely warns, because
+     * every javac error after an empty classpath would be misleading otherwise.
+     */
+    private static List<Path> collectTargetJars() throws IOException {
+        String configured = System.getenv(TARGET_DIR_ENV);
+        boolean explicit = configured != null && !configured.trim().isEmpty();
+        Path targetDir = explicit ? Paths.get(configured.trim()) : DEFAULT_TARGET_PLATFORM;
+
+        List<Path> targetJars = new ArrayList<Path>();
+        if (Files.isDirectory(targetDir)) {
+            Files.walkFileTree(targetDir, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                    if (file.getFileName().toString().endsWith(".jar")) {
+                        targetJars.add(file);
+                    }
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+            targetJars.sort(null);
+        } else if (explicit) {
+            fail(TARGET_DIR_ENV + " is not a directory: " + targetDir.toAbsolutePath().normalize());
+        }
+
+        if (targetJars.isEmpty()) {
+            String where = targetDir.toAbsolutePath().normalize().toString();
+            if (explicit) {
+                fail("no target-platform jars found under " + TARGET_DIR_ENV + "=" + where);
+            }
+            System.out.println(">> WARNING: no target-platform jars under " + where
+                    + " - expect 'cannot find symbol' for framework types (set "
+                    + TARGET_DIR_ENV + " or run from the repo root)");
+        } else {
+            System.out.println(">> target platform: " + targetJars.size() + " jars from "
+                    + targetDir.toAbsolutePath().normalize());
+        }
+        return targetJars;
     }
 
     /** One PDE bundle project, read entirely from its own metadata files. */

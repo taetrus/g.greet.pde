@@ -98,7 +98,9 @@ builds each from its own metadata: `Import/Export-Package` → compile order (to
 `Bundle-RequiredExecutionEnvironment` → `--release` level, `Bundle-ClassPath` → nested
 library jars (`lib/*.jar`) on that project's compile classpath, `build.properties`
 `source.*` → sources, `bin.includes` → shipped resources (e.g. `OSGI-INF/`, `lib/`). Compile classpath = dependency
-projects' classes + all `Deployment/target/*.jar`. Optional args restrict the build to the
+projects' classes + all target-platform jars from `$GREET_TARGET_DIR` (scanned recursively,
+so a `plugins/` subfolder layout works; missing/empty dir fails the build) or, unset,
+`Deployment/target/` (missing/empty only warns). Optional args restrict the build to the
 named project dirs. The `run-osgi.{sh,bat}` scripts resolve target-platform jars by
 symbolic-name prefix (not pinned version). Bundle locations are passed to the framework via
 `File.toURI()` (`scripts/Launcher.java`) so they form valid `file:` URLs on Windows paths

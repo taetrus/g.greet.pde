@@ -129,6 +129,12 @@ library type's method. The API bundle protects its implementors for free.
 
 ## Porting this to your real projects
 
+- Building outside greet: point `GREET_TARGET_DIR` at your target-platform
+  folder — it's scanned recursively, so an Eclipse-style `plugins/` layout
+  works. (Without it, `build-bundles` looks in `Deployment/target/` relative
+  to the current directory and every platform type becomes `cannot find
+  symbol`.) Note it wants a *folder of jars*; `.target` files pointing at p2
+  repositories are not resolved.
 - Point the runner's input dir (property `bundles.input.dir` in
   `obfuscation/pom.xml`) at your PDE export folder.
 - Point `deployment.target.dir` at your real target platform folder so
