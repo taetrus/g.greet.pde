@@ -37,10 +37,10 @@ javac -encoding UTF-8 -d <out> -cp <component-annotations-jar> `
 The four layers only prevent *new* damage. A repo that already has Cp1254-saved files
 needs them converted first.
 
-1. **Find non-UTF-8 files:**
+1. **Find non-UTF-8 files** (capture the hits — step 2 iterates over them):
 
    ```powershell
-   Get-ChildItem -Recurse -Include *.java,*.properties,MANIFEST.MF | ForEach-Object {
+   $hits = Get-ChildItem -Recurse -Include *.java,*.properties,MANIFEST.MF | ForEach-Object {
      $b = [IO.File]::ReadAllBytes($_.FullName)
      try {
        [Text.Encoding]::GetEncoding('utf-8',
@@ -48,14 +48,19 @@ needs them converted first.
          [Text.DecoderFallback]::ExceptionFallback).GetString($b) | Out-Null
      } catch { $_.FullName }
    }
+   $hits
    ```
+
+   If `$hits` prints nothing, the repo is already clean — skip step 2.
 
 2. **Convert each hit** (read as Cp1254, rewrite as UTF-8 without BOM), then review the
    diff to confirm the characters survived:
 
    ```powershell
-   $t = [IO.File]::ReadAllText($f, [Text.Encoding]::GetEncoding(1254))
-   [IO.File]::WriteAllText($f, $t, (New-Object Text.UTF8Encoding $false))
+   foreach ($f in $hits) {
+     $t = [IO.File]::ReadAllText($f, [Text.Encoding]::GetEncoding(1254))
+     [IO.File]::WriteAllText($f, $t, (New-Object Text.UTF8Encoding $false))
+   }
    ```
 
 3. **Replicate the four layers** listed above.
