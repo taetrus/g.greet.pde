@@ -94,7 +94,7 @@ On startup all four print `Greet.start()` / `App.start()` / `Greet.greet()` on e
 `build-bundles.{sh,bat}` are thin wrappers around `scripts/BundleBuilder.java` (single-file
 source-launch, so the build logic exists once, not per shell). It **auto-discovers** every
 bundle project at the repo root (dir with `META-INF/MANIFEST.MF` + `build.properties`) and
-builds each from its own metadata: `Import/Export-Package` → compile order (topological),
+builds each from its own metadata: `Import/Export-Package` + `Require-Bundle` → compile order (topological),
 `Bundle-RequiredExecutionEnvironment` → `--release` level, `Bundle-ClassPath` → nested
 library jars (`lib/*.jar`) on that project's compile classpath, `build.properties`
 `source.*` → sources, `bin.includes` → shipped resources (e.g. `OSGI-INF/`, `lib/`). Compile classpath = dependency

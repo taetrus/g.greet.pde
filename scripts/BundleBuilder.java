@@ -36,6 +36,7 @@ import javax.tools.ToolProvider;
  *   .project dir with META-INF/MANIFEST.MF + build.properties  -> it's a bundle project
  *   MANIFEST.MF  Bundle-SymbolicName                 -> jar name Deployment/build/<sn>.jar
  *   MANIFEST.MF  Import-Package / Export-Package    -> inter-project compile order (topo sort)
+ *   MANIFEST.MF  Require-Bundle                     -> ditto, by bundle symbolic name
  *   MANIFEST.MF  Bundle-RequiredExecutionEnvironment -> javac --release level
  *   MANIFEST.MF  Bundle-ClassPath                   -> nested library jars (lib/*.jar) added to
  *                                                      that project's compile classpath
@@ -171,6 +172,7 @@ public final class BundleBuilder {
         int release = 8;
         final Set<String> importedPackages = new LinkedHashSet<String>();
         final Set<String> exportedPackages = new LinkedHashSet<String>();
+        final Set<String> requiredBundles = new LinkedHashSet<String>();
         final List<Path> sourceRoots = new ArrayList<Path>();
         final List<String> binIncludes = new ArrayList<String>();
         final List<Path> classpathJars = new ArrayList<Path>();
@@ -199,6 +201,7 @@ public final class BundleBuilder {
             p.symbolicName = parseHeader(sn).get(0);
             p.importedPackages.addAll(parseHeader(p.manifest.getMainAttributes().getValue("Import-Package")));
             p.exportedPackages.addAll(parseHeader(p.manifest.getMainAttributes().getValue("Export-Package")));
+            p.requiredBundles.addAll(parseHeader(p.manifest.getMainAttributes().getValue("Require-Bundle")));
             p.release = releaseFromEE(p.symbolicName,
                     p.manifest.getMainAttributes().getValue("Bundle-RequiredExecutionEnvironment"));
             // Nested library jars (Bundle-ClassPath: ., lib/foo.jar) are part of
@@ -260,12 +263,15 @@ public final class BundleBuilder {
 
     /**
      * Orders projects so every project is compiled after the projects whose
-     * exported packages it imports. Imports satisfied by no discovered project
-     * are assumed to come from the target platform.
+     * exported packages it imports and the projects it requires by symbolic
+     * name (Require-Bundle). Imports/requires satisfied by no discovered
+     * project are assumed to come from the target platform.
      */
     private static List<Project> topoSort(List<Project> projects) {
         Map<String, Project> exporterOf = new TreeMap<String, Project>();
+        Map<String, Project> byName = new TreeMap<String, Project>();
         for (Project p : projects) {
+            byName.put(p.symbolicName, p);
             for (String pkg : p.exportedPackages) {
                 Project clash = exporterOf.put(pkg, p);
                 if (clash != null) {
@@ -278,12 +284,12 @@ public final class BundleBuilder {
         Set<Project> done = new LinkedHashSet<Project>();
         Set<Project> visiting = new LinkedHashSet<Project>();
         for (Project p : projects) {
-            visit(p, exporterOf, done, visiting, ordered);
+            visit(p, exporterOf, byName, done, visiting, ordered);
         }
         return ordered;
     }
 
-    private static void visit(Project p, Map<String, Project> exporterOf,
+    private static void visit(Project p, Map<String, Project> exporterOf, Map<String, Project> byName,
                               Set<Project> done, Set<Project> visiting, List<Project> ordered) {
         if (done.contains(p)) {
             return;
@@ -293,12 +299,18 @@ public final class BundleBuilder {
             for (Project v : visiting) {
                 cycle.append(v.symbolicName).append(" -> ");
             }
-            fail("Import-Package cycle among projects: " + cycle + p.symbolicName);
+            fail("dependency cycle among projects: " + cycle + p.symbolicName);
         }
         for (String pkg : p.importedPackages) {
             Project dep = exporterOf.get(pkg);
             if (dep != null && dep != p) {
-                visit(dep, exporterOf, done, visiting, ordered);
+                visit(dep, exporterOf, byName, done, visiting, ordered);
+            }
+        }
+        for (String required : p.requiredBundles) {
+            Project dep = byName.get(required);
+            if (dep != null && dep != p) {
+                visit(dep, exporterOf, byName, done, visiting, ordered);
             }
         }
         visiting.remove(p);
