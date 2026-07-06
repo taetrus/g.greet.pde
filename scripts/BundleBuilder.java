@@ -42,9 +42,10 @@ import javax.tools.ToolProvider;
  *   build.properties  source.*                      -> source roots to compile
  *   build.properties  bin.includes                  -> resources shipped in the jar (e.g. OSGI-INF, lib/)
  *
- * Compile classpath per project = its dependency projects' class dirs + every
- * target-platform jar under $GREET_TARGET_DIR (default: Deployment/target/,
- * scanned recursively).
+ * Compile classpath per project = its dependency projects' class dirs (plus
+ * those projects' own Bundle-ClassPath jars - library-wrapper bundles export
+ * packages that live in the nested jar) + every target-platform jar under
+ * $GREET_TARGET_DIR (default: Deployment/target/, scanned recursively).
  *
  * Usage:  java scripts/BundleBuilder.java [projectDir...]
  * With no args, all bundle projects in the repo root are discovered and built.
@@ -331,8 +332,14 @@ public final class BundleBuilder {
         for (Path jar : p.classpathJars) {
             cp.append(jar).append(java.io.File.pathSeparatorChar);
         }
-        for (Path dir : builtClassDirs.values()) {
-            cp.append(dir).append(java.io.File.pathSeparatorChar);
+        for (Map.Entry<Project, Path> built : builtClassDirs.entrySet()) {
+            cp.append(built.getValue()).append(java.io.File.pathSeparatorChar);
+            // A library-wrapper bundle exports packages that live in its
+            // Bundle-ClassPath jars, not its class dir - consumers compile
+            // against those jars too.
+            for (Path jar : built.getKey().classpathJars) {
+                cp.append(jar).append(java.io.File.pathSeparatorChar);
+            }
         }
         for (Path jar : targetJars) {
             cp.append(jar).append(java.io.File.pathSeparatorChar);
