@@ -76,6 +76,7 @@ Each step has a `.sh` (macOS/Linux/Git-Bash/WSL) and a `.bat` (Windows cmd) form
 export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-21.jdk/Contents/Home   # any current JDK
 ./scripts/build-bundles.sh                 # PDE-export stand-in: auto-discovers bundle projects; emits Java 8 bytecode
 mvn -f obfuscation/pom.xml package          # -> obfuscation/target/*-obf.jar, keep/*.pro, *-mapping.txt
+                                            #    honors $GREET_TARGET_DIR like build-bundles (-Ddeployment.target.dir= overrides)
 ./scripts/run-osgi.sh                       # boots Equinox + Felix SCR with the OBFUSCATED imp + app bundles
 USE_PLAIN=1 ./scripts/run-osgi.sh           # same, with the un-obfuscated bundles (A/B baseline)
 ```

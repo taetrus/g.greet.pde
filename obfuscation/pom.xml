@@ -19,9 +19,26 @@
     <repo.root>${project.basedir}/..</repo.root>
     <!-- Where scripts/build-bundles (the PDE export stand-in) puts bundle jars. -->
     <bundles.input.dir>${repo.root}/Deployment/build</bundles.input.dir>
-    <!-- Target-platform jars (OSGi framework + DS APIs), used as -libraryjars. -->
+    <!-- Target-platform jars (OSGi framework + DS APIs), used as -libraryjars.
+         The GREET_TARGET_DIR env var overrides this default (see the profile
+         below), so build-bundles and the obfuscation step read the same
+         location; an explicit -Ddeployment.target.dir= still wins over both. -->
     <deployment.target.dir>${repo.root}/Deployment/target</deployment.target.dir>
   </properties>
+
+  <profiles>
+    <profile>
+      <id>env-target-dir</id>
+      <activation>
+        <property>
+          <name>env.GREET_TARGET_DIR</name>
+        </property>
+      </activation>
+      <properties>
+        <deployment.target.dir>${env.GREET_TARGET_DIR}</deployment.target.dir>
+      </properties>
+    </profile>
+  </profiles>
 
   <dependencies>
     <!-- The runner drives ProGuard via its (de facto stable) programmatic entry
