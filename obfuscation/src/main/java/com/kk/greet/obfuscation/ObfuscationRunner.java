@@ -80,6 +80,26 @@ public final class ObfuscationRunner {
                     + " - run scripts/build-bundles first");
         }
 
+        // The library pool resolves every cross-bundle/framework type; a wrong
+        // dir here doesn't fail the run, it silently un-matches keep rules
+        // (-keep class * extends X finds no X) - so report it loudly up front.
+        long frameworkJars = 0;
+        if (Files.isDirectory(frameworkDir)) {
+            try (java.util.stream.Stream<Path> s = Files.walk(frameworkDir)) {
+                frameworkJars = s.filter(p -> p.getFileName().toString().endsWith(".jar")).count();
+            }
+        }
+        if (frameworkJars == 0) {
+            System.out.println(">> WARNING: no target-platform jars under "
+                    + frameworkDir.toAbsolutePath().normalize()
+                    + " - framework/cross-bundle types will be unresolved and keep rules"
+                    + " referring to them will silently match nothing"
+                    + " (set GREET_TARGET_DIR or -Ddeployment.target.dir=)");
+        } else {
+            System.out.println(">> library pool: " + frameworkJars + " target-platform jars from "
+                    + frameworkDir.toAbsolutePath().normalize());
+        }
+
         Files.createDirectories(outDir.resolve("keep"));
 
         List<BundleInfo> bundles = new ArrayList<BundleInfo>();
