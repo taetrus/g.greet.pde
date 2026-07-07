@@ -151,9 +151,17 @@ public final class ObfuscationRunner {
         }
         // Target-platform jars (OSGi framework + DS APIs) for bundles that
         // reference framework types (BundleActivator, ComponentContext, ...).
+        // Each jar is its own entry: a single dir(**.jar) entry reads the jars
+        // as opaque files without expanding their classes, leaving every
+        // platform type unresolved.
         if (Files.isDirectory(frameworkDir)) {
-            pg.add("-libraryjars");
-            pg.add(frameworkDir.toString() + "(**.jar)");
+            try (java.util.stream.Stream<Path> s = Files.walk(frameworkDir)) {
+                for (Path jar : s.filter(p -> p.getFileName().toString().endsWith(".jar"))
+                        .sorted().collect(java.util.stream.Collectors.toList())) {
+                    pg.add("-libraryjars");
+                    pg.add(jar.toString());
+                }
+            }
         }
         pg.add("-printmapping");
         pg.add(outDir.resolve(bundle.symbolicName + "-mapping.txt").toString());
