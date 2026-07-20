@@ -97,8 +97,12 @@ and `ui` bundles (plus the untouched `api`). Success looks like:
 Greet.start()
 App.start()
 Greet.greet()
-GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4 window=480x260
+GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4 window=480x260 token=s3..(15)
 ```
+
+(`token=s3..(15)` is a mask — first two chars + length — proving the encrypted
+`api.token` decrypted; the secret itself is never printed. See *Encrypted
+config values* below.)
 
 | knob | effect |
 |---|---|
@@ -111,6 +115,29 @@ GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4 window=480x260
 At the `g!` prompt: `ss` / `lb` (bundle states), `scr:list` (DS components;
 registers a moment after startup — retry if "command not found"),
 `scr:info <id>` (one component's references), `close` (shut down).
+
+### Encrypted config values
+
+Critical values in `configs/<bundle>/conf/*.properties` can be stored encrypted
+as `key=ENC(<base64>)`; the app decrypts them transparently at load time, so
+every getter sees plaintext. Encrypt a value with:
+
+```
+./scripts/encrypt-config.sh 's3cr3t-T0k3n-42'        # prints ENC(...) to paste in
+./scripts/encrypt-config.sh --decrypt 'ENC(...)'     # round-trip check
+scripts\encrypt-config.bat 's3cr3t-T0k3n-42'         # Windows
+```
+
+AES-128/GCM, fresh random IV per run (so the same plaintext yields a different
+`ENC(...)` each time — both decrypt fine). Only `ENC(...)`-wrapped values are
+touched; plain values are read as-is. A value that fails to decrypt (tampered,
+wrong key) logs a warning and is left untouched — the app still starts.
+
+**Reality check**: the key is embedded (XOR-split) in the obfuscated `ui`
+bundle, so this deters casual inspection of the config files — it is **not** a
+security boundary. Anyone with the jar can recover the key. For real protection,
+move the key out of the app (env var / key file / a KMS) and keep only the
+ciphertext on disk; the `ENC(...)` scheme and loader stay the same.
 
 Windows note: `set VAR=value` — no quotes, spaces are fine; clear with
 `set VAR=`.
@@ -125,6 +152,7 @@ Windows note: `set VAR=value` — no quotes, spaces are fine; clear with
 | obfuscation: `Note: ... refers to unknown class X` | your keep rule names a class ProGuard can't see — wrong FQN, or X's jar isn't in the library pool. Check the `>> library pool:` line; the note disappearing is the success signal. |
 | a bundle that must stay untouched got obfuscated | it was in `bundles.input.dir` (= "obfuscate these"). Move its jar to the target-platform dir (= "libraries, never touched"). |
 | UI: `MissingResourceException ... base name messages` | working directory ≠ repo root (typical for Eclipse launches) — pass `-Dgreet.lang.dir=<abs path to configs/com.kk.greet.ui/lang>` |
+| UI: `ConfCrypto: cannot decrypt ...` | the `ENC(...)` value was tampered, or its key constants don't match `scripts/EncryptConfig.java` — re-encrypt the value with the current tool. App still starts (value left as-is). |
 | Turkish characters corrupt / `unmappable character` | see [ENCODING.md](ENCODING.md) |
 
 ## Reality check on protection

@@ -8,6 +8,8 @@ Bundle-Vendor: KK
 Automatic-Module-Name: com.kk.greet.ui
 Bundle-ActivationPolicy: lazy
 Bundle-RequiredExecutionEnvironment: JavaSE-1.8
-Import-Package: javax.swing
+Import-Package: javax.crypto,
+ javax.crypto.spec,
+ javax.swing
 Bundle-ClassPath: .,
  lib/miglayout-3.7.4-swing.jar

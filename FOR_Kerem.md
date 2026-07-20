@@ -187,7 +187,10 @@ com.kk.greet.ui/             the Swing bundle; lib/ holds the nested MigLayout j
 configs/<bundle>/lang/       external messages[_tr|_en].properties (UTF-8),
                              per-bundle: currently configs/com.kk.greet.ui/lang/
 configs/<bundle>/conf/       external non-text settings, e.g.
-                             configs/com.kk.greet.ui/conf/ui.properties (window size)
+                             configs/com.kk.greet.ui/conf/ui.properties (window size);
+                             critical values stored as key=ENC(base64), decrypted at
+                             load by ConfCrypto — encrypt with scripts/encrypt-config.*
+                             (embedded key = deterrent, not a security boundary)
 Deployment/                  target platform jars + greet.target + greet.launch
 Deployment/build/            build-bundles output: the plain bundle jars
 scripts/                     build-bundles + run-osgi wrappers (.sh + .bat),

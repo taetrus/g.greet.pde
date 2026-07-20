@@ -41,6 +41,11 @@ final class UiConfig {
 		return !"false".equalsIgnoreCase(PROPS.getProperty("window.resizable", "true").trim());
 	}
 
+	/** Decrypted at load time by {@link ConfCrypto}; empty if not configured. */
+	static String apiToken() {
+		return PROPS.getProperty("api.token", "").trim();
+	}
+
 	private static int intValue(String key, int fallback) {
 		String value = PROPS.getProperty(key);
 		if (value == null || value.trim().isEmpty()) {
@@ -74,6 +79,8 @@ final class UiConfig {
 		} catch (IOException e) {
 			System.err.println("UiConfig: cannot read " + file + " (" + e + "), using defaults");
 		}
+		// Decrypt ENC(...) values in-place so every getter sees plaintext.
+		ConfCrypto.resolve(props);
 		return props;
 	}
 

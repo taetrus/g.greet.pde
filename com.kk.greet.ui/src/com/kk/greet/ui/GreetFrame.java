@@ -40,7 +40,8 @@ public class GreetFrame {
 		System.out.println("GreetFrame.start() lang=" + Messages.language()
 				+ " title=" + Messages.get("ui.title")
 				+ " miglayout=" + LayoutUtil.getVersion()
-				+ " window=" + windowSpec());
+				+ " window=" + windowSpec()
+				+ " token=" + maskedToken());
 
 		if ("check".equalsIgnoreCase(System.getenv("GREET_MODE"))) {
 			return;
@@ -77,6 +78,22 @@ public class GreetFrame {
 				frame = f;
 			}
 		});
+	}
+
+	/**
+	 * Masked form of the decrypted api.token — proves ENC(...) decryption worked
+	 * without ever printing the secret: first two chars + length, "-" if unset,
+	 * still "ENC(..)"-shaped (and thus visibly NOT decrypted) on decrypt failure.
+	 */
+	private static String maskedToken() {
+		String token = UiConfig.apiToken();
+		if (token.isEmpty()) {
+			return "-";
+		}
+		if (token.startsWith("ENC(")) {
+			return "ENC(?)";
+		}
+		return token.substring(0, Math.min(2, token.length())) + "..(" + token.length() + ")";
 	}
 
 	private static String windowSpec() {
