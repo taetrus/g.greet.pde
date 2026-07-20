@@ -19,7 +19,7 @@ import net.miginfocom.swing.MigLayout;
 // Encoding canary — must stay compilable: çğıöşü ÇĞİÖŞÜ
 /**
  * DS component that opens a small Swing window on activation. Every visible
- * text comes from the external resource bundle (configs/lang) via
+ * text comes from the external resource bundle (configs/com.kk.greet.ui/lang) via
  * {@link Messages} — no user-facing literals in code.
  *
  * The layout uses MigLayout from lib/ (a Bundle-ClassPath nested jar), proving

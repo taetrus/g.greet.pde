@@ -105,7 +105,7 @@ GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4
 | `USE_PLAIN=1` | boot the un-obfuscated jars from `Deployment/build/` instead — the A/B baseline; output must be identical |
 | `GREET_MODE=check` | no interactive console: activate DS, print the lines, exit. For scripts/CI. |
 | `GREET_LANG=tr\|en` (or `-Dgreet.lang`) | UI language. Unknown values fall back to the base (English) bundle; the platform default locale is deliberately ignored. |
-| `-Dgreet.lang.dir=<dir>` | where `messages[_xx].properties` live (default `configs/lang` **relative to the working directory** — set this when launching from Eclipse) |
+| `-Dgreet.lang.dir=<dir>` | where `messages[_xx].properties` live (default `configs/com.kk.greet.ui/lang` **relative to the working directory** — set this when launching from Eclipse) |
 
 At the `g!` prompt: `ss` / `lb` (bundle states), `scr:list` (DS components;
 registers a moment after startup — retry if "command not found"),
@@ -123,7 +123,7 @@ Windows note: `set VAR=value` — no quotes, spaces are fine; clear with
 | build: `NoSuchFieldError: JCTree$JCImport ... qualid` | Lombok jar too old for the JDK — upgrade Lombok to ≥ 1.18.30 (JDK 21), newer for JDK 24+ |
 | obfuscation: `Note: ... refers to unknown class X` | your keep rule names a class ProGuard can't see — wrong FQN, or X's jar isn't in the library pool. Check the `>> library pool:` line; the note disappearing is the success signal. |
 | a bundle that must stay untouched got obfuscated | it was in `bundles.input.dir` (= "obfuscate these"). Move its jar to the target-platform dir (= "libraries, never touched"). |
-| UI: `MissingResourceException ... base name messages` | working directory ≠ repo root (typical for Eclipse launches) — pass `-Dgreet.lang.dir=<abs path to configs/lang>` |
+| UI: `MissingResourceException ... base name messages` | working directory ≠ repo root (typical for Eclipse launches) — pass `-Dgreet.lang.dir=<abs path to configs/com.kk.greet.ui/lang>` |
 | Turkish characters corrupt / `unmappable character` | see [ENCODING.md](ENCODING.md) |
 
 ## Reality check on protection

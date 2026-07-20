@@ -14,7 +14,7 @@
 # Env:
 #   USE_PLAIN=1     run the un-obfuscated bundles (A/B comparison)
 #   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
-#   GREET_LANG=tr|en  UI language; picks configs/lang/messages_<lang>.properties
+#   GREET_LANG=tr|en  UI language; picks configs/com.kk.greet.ui/lang/messages_<lang>.properties
 #                     (default en; unknown values fall back to English)
 
 set -euo pipefail

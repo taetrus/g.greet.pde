@@ -16,7 +16,8 @@ import java.util.ResourceBundle;
 
 // Encoding canary — must stay compilable: çğıöşü ÇĞİÖŞÜ
 /**
- * Loads UI texts from external resource bundles in {@code configs/lang/}
+ * Loads UI texts from external resource bundles in
+ * {@code configs/com.kk.greet.ui/lang/}
  * (override the directory with {@code -Dgreet.lang.dir}).
  *
  * Language selection at launch: {@code -Dgreet.lang=tr|en}, or the
@@ -52,7 +53,7 @@ final class Messages {
 	}
 
 	private static ResourceBundle load() {
-		String dir = System.getProperty("greet.lang.dir", "configs/lang");
+		String dir = System.getProperty("greet.lang.dir", "configs/com.kk.greet.ui/lang");
 		try {
 			URL url = new File(dir).toURI().toURL();
 			// Parent loader null: bundles come from the directory only, never

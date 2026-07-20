@@ -24,7 +24,7 @@ Think of it as a restaurant:
   prove two extra things survive the pipeline: a **third-party library embedded
   inside the bundle** (MigLayout, via `Bundle-ClassPath: ., lib/miglayout-3.7.4-swing.jar`)
   and **externalized text** — every visible string comes from
-  `configs/lang/messages[_tr|_en].properties`, none from code.
+  `configs/com.kk.greet.ui/lang/messages[_tr|_en].properties`, none from code.
 
 At startup, Felix SCR (the DS runtime) wires it all up and you see:
 
@@ -184,7 +184,8 @@ library type's method. The API bundle protects its implementors for free.
 ```
 com.kk.greet.api|imp|app/    the core PDE bundles (src/, META-INF/, OSGI-INF/)
 com.kk.greet.ui/             the Swing bundle; lib/ holds the nested MigLayout jar
-configs/lang/                external messages[_tr|_en].properties (UTF-8)
+configs/<bundle>/lang/       external messages[_tr|_en].properties (UTF-8),
+                             per-bundle: currently configs/com.kk.greet.ui/lang/
 Deployment/                  target platform jars + greet.target + greet.launch
 Deployment/build/            build-bundles output: the plain bundle jars
 scripts/                     build-bundles + run-osgi wrappers (.sh + .bat),

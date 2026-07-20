@@ -15,7 +15,7 @@ rem
 rem Env:
 rem   USE_PLAIN=1       run the un-obfuscated bundles (A/B comparison)
 rem   GREET_MODE=check  non-interactive: activate DS, print, exit (for scripted checks)
-rem   GREET_LANG=tr^|en  UI language; picks configs\lang\messages_^<lang^>.properties
+rem   GREET_LANG=tr^|en  UI language; picks configs\com.kk.greet.ui\lang\messages_^<lang^>.properties
 rem                     (default en; unknown values fall back to English)
 rem   e.g.  set USE_PLAIN=1 && scripts\run-osgi.bat
 
