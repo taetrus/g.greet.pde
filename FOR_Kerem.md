@@ -186,6 +186,8 @@ com.kk.greet.api|imp|app/    the core PDE bundles (src/, META-INF/, OSGI-INF/)
 com.kk.greet.ui/             the Swing bundle; lib/ holds the nested MigLayout jar
 configs/<bundle>/lang/       external messages[_tr|_en].properties (UTF-8),
                              per-bundle: currently configs/com.kk.greet.ui/lang/
+configs/<bundle>/conf/       external non-text settings, e.g.
+                             configs/com.kk.greet.ui/conf/ui.properties (window size)
 Deployment/                  target platform jars + greet.target + greet.launch
 Deployment/build/            build-bundles output: the plain bundle jars
 scripts/                     build-bundles + run-osgi wrappers (.sh + .bat),

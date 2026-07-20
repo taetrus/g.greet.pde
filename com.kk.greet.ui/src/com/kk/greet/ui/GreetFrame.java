@@ -39,7 +39,8 @@ public class GreetFrame {
 	public void start() {
 		System.out.println("GreetFrame.start() lang=" + Messages.language()
 				+ " title=" + Messages.get("ui.title")
-				+ " miglayout=" + LayoutUtil.getVersion());
+				+ " miglayout=" + LayoutUtil.getVersion()
+				+ " window=" + windowSpec());
 
 		if ("check".equalsIgnoreCase(System.getenv("GREET_MODE"))) {
 			return;
@@ -67,11 +68,22 @@ public class GreetFrame {
 				f.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
 				f.setContentPane(content);
 				f.pack();
+				if (UiConfig.windowWidth() > 0 && UiConfig.windowHeight() > 0) {
+					f.setSize(UiConfig.windowWidth(), UiConfig.windowHeight());
+				}
+				f.setResizable(UiConfig.windowResizable());
 				f.setLocationByPlatform(true);
 				f.setVisible(true);
 				frame = f;
 			}
 		});
+	}
+
+	private static String windowSpec() {
+		int w = UiConfig.windowWidth();
+		int h = UiConfig.windowHeight();
+		return (w > 0 && h > 0 ? w + "x" + h : "pack")
+				+ (UiConfig.windowResizable() ? "" : ",fixed");
 	}
 
 	@Deactivate

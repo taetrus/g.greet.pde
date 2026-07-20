@@ -97,7 +97,7 @@ and `ui` bundles (plus the untouched `api`). Success looks like:
 Greet.start()
 App.start()
 Greet.greet()
-GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4
+GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4 window=480x260
 ```
 
 | knob | effect |
@@ -106,6 +106,7 @@ GreetFrame.start() lang=en title=Greeting Window miglayout=3.7.4
 | `GREET_MODE=check` | no interactive console: activate DS, print the lines, exit. For scripts/CI. |
 | `GREET_LANG=tr\|en` (or `-Dgreet.lang`) | UI language. Unknown values fall back to the base (English) bundle; the platform default locale is deliberately ignored. |
 | `-Dgreet.lang.dir=<dir>` | where `messages[_xx].properties` live (default `configs/com.kk.greet.ui/lang` **relative to the working directory** — set this when launching from Eclipse) |
+| `-Dgreet.conf.dir=<dir>` | where `ui.properties` lives (default `configs/com.kk.greet.ui/conf`, same working-directory caveat). Window geometry etc.; a missing file just means built-in defaults (`window=pack`). |
 
 At the `g!` prompt: `ss` / `lb` (bundle states), `scr:list` (DS components;
 registers a moment after startup — retry if "command not found"),
