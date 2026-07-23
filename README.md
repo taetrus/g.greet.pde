@@ -116,31 +116,113 @@ At the `g!` prompt: `ss` / `lb` (bundle states), `scr:list` (DS components;
 registers a moment after startup — retry if "command not found"),
 `scr:info <id>` (one component's references), `close` (shut down).
 
-### Encrypted config values
-
-Critical values in `configs/<bundle>/conf/*.properties` can be stored encrypted
-as `key=ENC(<base64>)`; the app decrypts them transparently at load time, so
-every getter sees plaintext. Encrypt a value with:
-
-```
-./scripts/encrypt-config.sh 's3cr3t-T0k3n-42'        # prints ENC(...) to paste in
-./scripts/encrypt-config.sh --decrypt 'ENC(...)'     # round-trip check
-scripts\encrypt-config.bat 's3cr3t-T0k3n-42'         # Windows
-```
-
-AES-128/GCM, fresh random IV per run (so the same plaintext yields a different
-`ENC(...)` each time — both decrypt fine). Only `ENC(...)`-wrapped values are
-touched; plain values are read as-is. A value that fails to decrypt (tampered,
-wrong key) logs a warning and is left untouched — the app still starts.
-
-**Reality check**: the key is embedded (XOR-split) in the obfuscated `ui`
-bundle, so this deters casual inspection of the config files — it is **not** a
-security boundary. Anyone with the jar can recover the key. For real protection,
-move the key out of the app (env var / key file / a KMS) and keep only the
-ciphertext on disk; the `ENC(...)` scheme and loader stay the same.
-
 Windows note: `set VAR=value` — no quotes, spaces are fine; clear with
 `set VAR=`.
+
+## Encrypted config values
+
+Config files such as `configs/com.kk.greet.ui/conf/ui.properties` sit in the
+clear on disk. Individual **critical** values (an API token, a password) can be
+stored encrypted instead, while non-secret values (window size, language) stay
+readable. An encrypted value is wrapped in an `ENC(...)` marker:
+
+```properties
+window.width=480                 # plain — readable, diffable
+api.token=ENC(LY72ALA8+DU18t...) # encrypted — opaque on disk
+```
+
+The app decrypts `ENC(...)` values **transparently at load time**, so
+application code just calls `UiConfig.apiToken()` and gets plaintext back — it
+never sees the ciphertext. Only `ENC(...)`-wrapped values are touched; anything
+else is read as-is.
+
+### How it works
+
+- **Cipher**: AES-128/GCM (`AES/GCM/NoPadding`). A fresh random 12-byte IV is
+  generated per encryption and prepended to the ciphertext; the whole blob is
+  Base64-encoded into the `ENC(...)`. GCM also authenticates: a tampered value
+  fails to decrypt rather than returning garbage.
+- **Same plaintext → different `ENC(...)` every time** (the IV is random). Both
+  still decrypt to the same value — don't expect the strings to match.
+- **Two halves of one system, sharing one key**:
+  - encrypt side — `scripts/EncryptConfig.java` (the CLI below)
+  - decrypt side — `ConfCrypto` inside the `com.kk.greet.ui` bundle, called from
+    `UiConfig.load()`
+
+### Encrypt a value (step by step)
+
+1. Run the tool with your secret as the argument:
+
+   ```bash
+   ./scripts/encrypt-config.sh 's3cr3t-T0k3n-42'     # macOS/Linux
+   scripts\encrypt-config.bat "s3cr3t-T0k3n-42"      # Windows
+   ```
+
+   It prints something like `ENC(LY72ALA8+DU18tcgvQRGWIvhDlVYKJMuPOZ7W+QR90...)`.
+   (Quote the value so the shell doesn't split or expand it.)
+
+2. Paste that whole `ENC(...)` string — parentheses included — as the value in
+   the `.properties` file:
+
+   ```properties
+   api.token=ENC(LY72ALA8+DU18tcgvQRGWIvhDlVYKJMuPOZ7W+QR90...)
+   ```
+
+3. (Optional) Round-trip check that it decrypts back to what you put in:
+
+   ```bash
+   ./scripts/encrypt-config.sh --decrypt 'ENC(LY72ALA8+DU18t...)'
+   ```
+
+4. Run the app. The `GREET_MODE=check` line prints a **masked** confirmation —
+   `token=s3..(15)` (first two chars + length), never the secret itself — so you
+   can verify decryption worked without leaking anything.
+
+If a value can't be decrypted (someone edited the ciphertext, or the key
+changed) the app logs `ConfCrypto: cannot decrypt ...`, leaves the value as the
+literal `ENC(...)` string, and **still starts** — fail-soft, so one bad secret
+never takes the whole app down.
+
+### Where the key is stored (read this)
+
+The AES key is **embedded in the application itself** — it lives, XOR-split
+across two byte arrays, in two places that must stay identical:
+
+- `com.kk.greet.ui/src/com/kk/greet/ui/ConfCrypto.java` (decrypt, ships in the
+  bundle)
+- `scripts/EncryptConfig.java` (encrypt, dev tooling — can't depend on bundle
+  code, hence the duplication; a comment in each points at the other)
+
+It's XOR-split rather than a single literal because ProGuard renames class and
+method names but **never rewrites constant data** — a plain `"mykey"` string
+would survive obfuscation intact and show up under `strings the.jar`. XORing two
+arrays at runtime removes that grep-able literal.
+
+**This is a deterrent, not a security boundary.** Because the key ships inside
+the app, anyone who has the jar can recover it and decrypt every value. What
+this buys you: config files can't be read at a glance, casually shared, or
+committed with secrets in the clear. What it does **not** buy you: protection
+against someone who has the application binary.
+
+### How to make it actually secure
+
+The `ENC(...)` format and the loading logic don't need to change — only *where
+`ConfCrypto` gets the key* does. In rough order of strength:
+
+1. **Key file outside the repo** — read the key from a path given by an env var
+   (`GREET_CONF_KEY`) or system property, with the file living outside version
+   control (and outside the shipped jar). Now the jar alone can't decrypt
+   anything; an attacker also needs the deployment host's key file.
+2. **Environment / secrets manager** — inject the key via the environment from a
+   vault (HashiCorp Vault, AWS/GCP Secrets Manager, Kubernetes secret). The key
+   is never on disk next to the app at all.
+3. **KMS / envelope encryption** — keep only a *wrapped* data key on disk and
+   have a KMS unwrap it at startup; the raw key never leaves the KMS boundary.
+
+In every case: drop the embedded `K1`/`K2` constants, source the key bytes from
+the chosen provider in `ConfCrypto` (fail hard if it's missing), and keep the
+encrypt tool in sync. Everything else — `ENC(...)` markers, per-value
+granularity, transparent decryption at load — stays exactly as it is today.
 
 ## Troubleshooting
 
