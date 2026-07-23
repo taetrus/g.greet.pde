@@ -183,6 +183,47 @@ changed) the app logs `ConfCrypto: cannot decrypt ...`, leaves the value as the
 literal `ENC(...)` string, and **still starts** — fail-soft, so one bad secret
 never takes the whole app down.
 
+### Add a *new* encrypted key
+
+The steps above encrypt a value for an existing key (`api.token`). To introduce
+a brand-new secret — say `db.password` — you also wire it through to code. The
+encryption itself is unchanged; `ConfCrypto` decrypts *any* `ENC(...)` value, so
+no crypto code is touched.
+
+1. **Encrypt the secret** and add it to the bundle's `.properties` file
+   (`configs/com.kk.greet.ui/conf/ui.properties`):
+
+   ```bash
+   ./scripts/encrypt-config.sh 'p@ssw0rd-123'
+   ```
+   ```properties
+   db.password=ENC(9fKq2p...)
+   ```
+
+2. **Add a getter** in `UiConfig`
+   (`com.kk.greet.ui/src/com/kk/greet/ui/UiConfig.java`), mirroring `apiToken()`.
+   `ConfCrypto.resolve()` has already replaced the `ENC(...)` with plaintext by
+   the time any getter runs, so the getter just reads the property:
+
+   ```java
+   /** Decrypted at load time by {@link ConfCrypto}; empty if not configured. */
+   static String dbPassword() {
+       return PROPS.getProperty("db.password", "").trim();
+   }
+   ```
+
+3. **Use it** from wherever needs the secret (e.g. `GreetFrame`). If you print or
+   log it, mask it the way `maskedToken()` does — never emit the raw value.
+
+That's the whole loop. Points to remember:
+
+- A new key in a **different bundle** needs that bundle to have its own decrypt
+  path — today only `com.kk.greet.ui` carries `ConfCrypto` and the
+  `javax.crypto`/`javax.crypto.spec` `Import-Package` entries (see its
+  `META-INF/MANIFEST.MF`). Copy both into the new bundle to reuse the scheme.
+- Keep secrets out of `lang/` — that's for user-visible text. Encrypted values
+  belong in `conf/`.
+
 ### Where the key is stored (read this)
 
 The AES key is **embedded in the application itself** — it lives, XOR-split
