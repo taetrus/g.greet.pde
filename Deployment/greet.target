@@ -12,6 +12,6 @@
       </features>
    </content>
 	<locations>
-		<location path="${project_loc}/target" type="Directory"/>
+		<location path="/Users/avalon/dev/g.greet.pde/Deployment/target" type="Directory"/>
 	</locations>
 </target>
