@@ -14,3 +14,7 @@ tmp/
 # OS / editor
 *~
 *.swp
+
+# Build/obfuscation output (pipeline lives on another branch)
+Deployment/build/
+obfuscation/target/
